@@ -26,7 +26,12 @@ jobs:
           java -Dfile.encoding=UTF-8 -cp out FakeAdbTest
           java -Dfile.encoding=UTF-8 -cp out LogicTest
 
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK (déjà présent sur la machine)
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
+          SM=$(ls /usr/local/lib/android/sdk/cmdline-tools/*/bin/sdkmanager | tail -1)
+          yes | "$SM" --licenses >/dev/null 2>&1 || true
+          "$SM" "platforms;android-35" "build-tools;35.0.0" 2>&1 | tail -3 || true
 
       - uses: gradle/actions/setup-gradle@v4
         with:
