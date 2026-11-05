@@ -73,7 +73,7 @@ final class TabletLink {
                     ch.close();
                 } catch (IOException ignored) {
                 }
-                if (e.getMessage() != null && e.getMessage().contains("refusée")) break;
+                if (e.getMessage() != null && e.getMessage().contains("Autorisation refusée")) break;
                 try {
                     Thread.sleep(1200);
                 } catch (InterruptedException ignored) {
