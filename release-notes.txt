@@ -1,1 +1,1 @@
-Première version de Doc Tablette : bilan, réparations, applis, mises à jour et tests d'une tablette Android branchée par câble.
+Nouveau : détection automatique de la situation au branchement du câble, sauvegarde des photos et vidéos vers le téléphone (sans rien effacer), mode simple, et guide de dépannage hors connexion avec recherche (plus de 400 fiches, câbles et matériel, marques).

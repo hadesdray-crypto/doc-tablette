@@ -1,0 +1,449 @@
+package fr.doctablette;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/** Écrans ajoutés : situation au branchement, sauvegarde, guide, matériel, mode enfant. */
+final class ExtraScreens {
+    static final int REQ_TREE = 12;
+    private final MainActivity a;
+
+    // état
+    Situation situation;
+    String guideCat = "";
+    boolean guideUnconv;
+    String guideQuery = "";
+    Guide.Card card;
+    boolean authRefused;
+
+    Uri tree;
+    final boolean[] kindOn = {true, false, false, false};
+    List<Backup.Item> items;
+    String backupMsg = "";
+    boolean backupBusy;
+    Backup backup;
+    TextView backupLine;
+    ProgressBar backupBar;
+
+    ExtraScreens(MainActivity a) {
+        this.a = a;
+        String t = a.prefs.getString("backup_tree", "");
+        if (!t.isEmpty()) tree = Uri.parse(t);
+    }
+
+    // ------------------------------------------------------------------
+    // Situation détectée au branchement
+    // ------------------------------------------------------------------
+    void refreshSituation() {
+        String banner = a.link.cx != null ? a.link.cx.banner() : "";
+        situation = Situation.best(a.usb.getDeviceList(), banner, a.link.isConnected(), authRefused,
+                a.getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST));
+    }
+
+    void situationScreen(LinearLayout c) {
+        refreshSituation();
+        Situation s = situation;
+        LinearLayout k = a.card(s.kind == Situation.ADB ? MainActivity.C_OK : MainActivity.C_WARN);
+        k.addView(a.tv(s.title, 19, MainActivity.TEXT, true));
+        k.addView(a.tv(s.text, 16, MainActivity.TEXT, false));
+        c.addView(k);
+        if (s.steps.length > 0) {
+            c.addView(a.tv("Quoi faire", 17, MainActivity.ACCENT, true));
+            int n = 1;
+            for (String st : s.steps) c.addView(a.tv(n++ + ". " + st, 16, MainActivity.TEXT, false));
+        }
+        LinearLayout e = a.card(MainActivity.C_WARN);
+        e.addView(a.tv("Ce qui sera effacé", 16, MainActivity.C_WARN, true));
+        e.addView(a.tv(s.erases, 15, MainActivity.TEXT, false));
+        c.addView(e);
+        if (s.kind == Situation.ADB) {
+            if (a.link.isConnected()) {
+                c.addView(a.btn("Sauvegarder mes photos et vidéos", true, v -> a.go("BACKUP")));
+                c.addView(a.btn("Faire le bilan", false, v -> {
+                    a.go("BILAN");
+                    a.runBilan();
+                }));
+                c.addView(a.btn("Tout réparer", false, v -> a.go("REPAIR")));
+            } else {
+                c.addView(a.btn("Se connecter à la tablette", true, v -> a.go("CONNECT")));
+            }
+        }
+        if (s.kind == Situation.UNAUTHORIZED) c.addView(a.btn("Réessayer la connexion", true, v -> a.go("CONNECT")));
+        c.addView(a.btn("Voir le guide pour ce cas", false, v -> openGuide(s.query)));
+        c.addView(a.btn("Chercher à nouveau", false, v -> {
+            a.scanUsb(true);
+            a.render();
+        }));
+    }
+
+    // ------------------------------------------------------------------
+    // Sauvegarde photos / vidéos / documents
+    // ------------------------------------------------------------------
+    void backupScreen(LinearLayout c) {
+        if (!a.needTablet(c)) return;
+        c.addView(a.tv("La sauvegarde COPIE les fichiers de la tablette vers votre téléphone. Elle n'efface rien sur la tablette.", 16, MainActivity.TEXT, false));
+        LinearLayout k = a.card(tree != null ? MainActivity.C_OK : 0);
+        k.addView(a.tv(tree != null ? "Dossier de sauvegarde choisi." : "1. Choisissez où mettre la sauvegarde.", 16, MainActivity.TEXT, true));
+        c.addView(k);
+        if (!backupBusy) c.addView(a.btn(tree != null ? "Changer le dossier" : "Choisir le dossier", tree == null, v -> pickTree()));
+        c.addView(a.tv("2. Que copier ?", 16, MainActivity.TEXT, true));
+        for (int i = 0; i < Backup.KINDS.length; i++) {
+            final int idx = i;
+            Button b = a.btn((kindOn[i] ? "[x] " : "[  ] ") + Backup.KINDS[i][0], false, v -> {
+                if (backupBusy) return;
+                kindOn[idx] = !kindOn[idx];
+                items = null;
+                a.render();
+            });
+            c.addView(b);
+        }
+        if (items != null) {
+            long tot = 0;
+            for (Backup.Item it : items) if (it.size > 0) tot += it.size;
+            LinearLayout r = a.card(0);
+            r.addView(a.tv(items.size() + " fichiers trouvés" + (tot > 0 ? ", environ " + mo(tot) : "") + ".", 16, MainActivity.TEXT, true));
+            r.addView(a.tv("Vérifiez qu'il reste assez de place sur le téléphone. Les fichiers déjà copiés sont passés.", 14, MainActivity.MUTED, false));
+            c.addView(r);
+        }
+        if (!backupBusy) {
+            c.addView(a.btn("3. Analyser la tablette", false, v -> analyze()));
+            if (items != null && !items.isEmpty() && tree != null) c.addView(a.btn("4. Copier maintenant", true, v -> startCopy()));
+        } else {
+            c.addView(a.btn("Arrêter la copie", false, v -> {
+                if (backup != null) backup.cancel = true;
+            }));
+        }
+        LinearLayout st = a.card(0);
+        backupLine = a.tv(backupMsg.isEmpty() ? "Le déroulement s'affichera ici." : backupMsg, 14, MainActivity.MUTED, false);
+        st.addView(backupLine);
+        backupBar = new ProgressBar(a, null, android.R.attr.progressBarStyleHorizontal);
+        backupBar.setMax(1000);
+        st.addView(backupBar);
+        c.addView(st);
+    }
+
+    static String mo(long b) {
+        if (b > 1073741824L) return String.format(java.util.Locale.FRANCE, "%.1f Go", b / 1073741824.0);
+        return (b / 1048576) + " Mo";
+    }
+
+    void pickTree() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        try {
+            a.startActivityForResult(i, REQ_TREE);
+        } catch (Exception e) {
+            a.info("Impossible", "Ce téléphone n'a pas de sélecteur de dossier. Utilisez le guide « Récupérer photos et vidéos ».");
+        }
+    }
+
+    void onTree(Uri u) {
+        if (u == null) return;
+        try {
+            a.getContentResolver().takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        } catch (Exception ignored) {
+        }
+        tree = u;
+        a.prefs.edit().putString("backup_tree", u.toString()).apply();
+        a.render();
+    }
+
+    void setBackupMsg(String m) {
+        backupMsg = m;
+        a.ui.post(() -> {
+            if (backupLine != null) backupLine.setText(m);
+        });
+    }
+
+    void analyze() {
+        StringBuilder dirs = new StringBuilder();
+        for (int i = 0; i < Backup.KINDS.length; i++) if (kindOn[i]) dirs.append(Backup.KINDS[i][1]).append(' ');
+        if (dirs.length() == 0) {
+            a.toast("Cochez au moins une catégorie");
+            return;
+        }
+        backupBusy = true;
+        setBackupMsg("Analyse de la tablette… (peut durer une minute)");
+        a.render();
+        final String d = dirs.toString();
+        a.io.execute(() -> {
+            try {
+                List<Backup.Item> l = Backup.scan(a.link, d);
+                a.ui.post(() -> {
+                    items = l;
+                    backupBusy = false;
+                    backupMsg = l.isEmpty() ? "Aucun fichier trouvé dans ces dossiers." : "Analyse terminée.";
+                    a.render();
+                });
+            } catch (Exception e) {
+                a.ui.post(() -> {
+                    backupBusy = false;
+                    backupMsg = "Analyse impossible : " + TabletLink.explain(e);
+                    a.render();
+                });
+            }
+        });
+    }
+
+    void startCopy() {
+        if (tree == null || items == null || backupBusy) return;
+        backupBusy = true;
+        backup = new Backup(a, tree);
+        final List<Backup.Item> list = items;
+        setBackupMsg("Copie en cours…");
+        a.render();
+        a.io.execute(() -> {
+            try {
+                if (a.link.cx != null) a.link.cx.setIdleExtend(60000);
+            } catch (Exception ignored) {
+            }
+            Backup.Result r = backup.run(a.link, list, (n, total, name, done, bytes) -> a.ui.post(() -> {
+                if (backupLine != null) backupLine.setText("Copie " + n + " / " + total + "\n" + name);
+                if (backupBar != null && bytes > 0) backupBar.setProgress((int) (1000L * done / bytes));
+            }));
+            StringBuilder sb = new StringBuilder();
+            sb.append(r.cancelled ? "Copie arrêtée.\n" : "Copie terminée.\n");
+            sb.append(r.copied).append(" copiés (").append(mo(r.bytes)).append("), ").append(r.skipped).append(" déjà présents, ").append(r.failed).append(" en échec.");
+            for (String f : r.failures) sb.append("\n- ").append(f);
+            final String msg = sb.toString();
+            a.ui.post(() -> {
+                backupBusy = false;
+                backupMsg = msg;
+                a.render();
+            });
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Guide
+    // ------------------------------------------------------------------
+    void openGuide(String q) {
+        guideQuery = q == null ? "" : q;
+        guideCat = "";
+        guideUnconv = false;
+        if (!a.top().equals("GUIDE")) a.go("GUIDE");
+        else a.render();
+    }
+
+    void guideScreen(LinearLayout c) {
+        c.addView(a.tv("Cherchez le modèle de la tablette ou ce qui ne va pas. Par exemple : « Archos écran noir », « batterie ne charge plus », « photos ».", 15, MainActivity.MUTED, false));
+        final EditText e = new EditText(a);
+        e.setHint("Modèle, marque, problème…");
+        e.setHintTextColor(MainActivity.MUTED);
+        e.setTextColor(MainActivity.TEXT);
+        e.setSingleLine(true);
+        e.setInputType(InputType.TYPE_CLASS_TEXT);
+        e.setText(guideQuery);
+        c.addView(e, new LinearLayout.LayoutParams(MainActivity.MATCH, MainActivity.WRAP));
+        c.addView(a.btn("Chercher", true, v -> {
+            guideQuery = e.getText().toString();
+            a.render();
+        }));
+        if (!guideQuery.trim().isEmpty()) {
+            List<Guide.Card> res = Guide.search(a, guideQuery, false);
+            c.addView(a.tv(res.isEmpty() ? "Aucune fiche. Essayez d'autres mots (sans faute, ou la marque seule)." : res.size() + " fiches", 16, MainActivity.TEXT, true));
+            int n = 0;
+            for (Guide.Card g : res) {
+                if (n++ >= 30) break;
+                addCardButton(c, g);
+            }
+            c.addView(a.btn("Effacer la recherche", false, v -> {
+                guideQuery = "";
+                a.render();
+            }));
+            return;
+        }
+        c.addView(a.tv("Par sujet", 17, MainActivity.ACCENT, true));
+        Map<String, List<Guide.Card>> cats = Guide.byCategory(a, false);
+        for (Map.Entry<String, List<Guide.Card>> en : cats.entrySet()) {
+            final String cat = en.getKey();
+            c.addView(a.btn(cat + " (" + en.getValue().size() + ")", false, v -> {
+                guideCat = cat;
+                guideUnconv = false;
+                a.go("GUIDELIST");
+            }));
+        }
+        c.addView(a.btn("Techniques non conventionnelles", false, v -> {
+            guideUnconv = true;
+            guideCat = "";
+            a.go("GUIDELIST");
+        }));
+        c.addView(a.btn("Câbles et matériel à acheter", false, v -> a.go("HARDWARE")));
+        c.addView(a.btn("Marques : touches et outils", false, v -> a.go("BRANDS")));
+        c.addView(a.tv("Les fiches sans mention « à vérifier » ont été recoupées par 2 sources ou plus. Les autres sont rapportées par des utilisateurs : à vérifier sur votre modèle.", 13, MainActivity.MUTED, false));
+    }
+
+    void guideListScreen(LinearLayout c) {
+        c.addView(a.tv(guideUnconv ? "Techniques non conventionnelles" : guideCat, 18, MainActivity.TEXT, true));
+        if (guideUnconv) c.addView(a.tv("Astuces de passionnés. Elles marchent pour certains, pas pour tous : lisez l'avertissement de chaque fiche. Aucune ne contourne un verrouillage.", 14, MainActivity.MUTED, false));
+        List<Guide.Card> l = guideUnconv ? Guide.search(a, "", true) : Guide.byCategory(a, false).get(guideCat);
+        if (l == null) l = new ArrayList<>();
+        for (Guide.Card g : l) addCardButton(c, g);
+    }
+
+    void addCardButton(LinearLayout c, Guide.Card g) {
+        String tag = g.verified ? "" : "  (à vérifier)";
+        c.addView(a.btn(g.title + tag, false, v -> {
+            card = g;
+            a.go("CARD");
+        }));
+        if (!g.summary.isEmpty()) c.addView(a.tv(g.summary, 13, MainActivity.MUTED, false));
+    }
+
+    void cardScreen(LinearLayout c) {
+        Guide.Card g = card;
+        if (g == null) {
+            c.addView(a.tv("Fiche introuvable.", 16, MainActivity.TEXT, false));
+            return;
+        }
+        c.addView(a.tv(g.title, 19, MainActivity.TEXT, true));
+        if (!g.summary.isEmpty()) c.addView(a.tv(g.summary, 16, MainActivity.TEXT, false));
+        LinearLayout k = a.card(g.dataLoss ? MainActivity.C_BAD : (g.verified ? MainActivity.C_OK : MainActivity.C_WARN));
+        k.addView(a.tv(g.dataLoss ? "ATTENTION : cette opération peut effacer vos données (photos, vidéos, applis). Sauvegardez d'abord." : "Aucune donnée effacée par cette fiche.", 15, MainActivity.TEXT, true));
+        k.addView(a.tv((g.verified ? "Recoupée par au moins 2 sources lors de la recherche (pas testée sur votre modèle)." : "À vérifier : source unique ou rapportée par des utilisateurs.")
+                + (g.unconventional ? " Technique non conventionnelle." : "") + " Risque : " + g.risk + ". Marques : " + String.join(", ", g.brands) + ". Android : " + g.android + ".", 13, MainActivity.MUTED, false));
+        c.addView(k);
+        if (g.dataLoss && a.link.isConnected()) c.addView(a.btn("Sauvegarder mes photos avant", true, v -> a.go("BACKUP")));
+        c.addView(a.tv("Les étapes", 17, MainActivity.ACCENT, true));
+        int n = 1;
+        for (String s : g.steps) c.addView(a.tv(n++ + ". " + s, 16, MainActivity.TEXT, false));
+        if (!g.warn.isEmpty()) {
+            LinearLayout w = a.card(MainActivity.C_WARN);
+            w.addView(a.tv("Attention : " + g.warn, 15, MainActivity.TEXT, false));
+            c.addView(w);
+        }
+        if (!g.sources.isEmpty()) {
+            c.addView(a.tv("Sources (touchez pour ouvrir)", 14, MainActivity.MUTED, true));
+            for (String s : g.sources) c.addView(a.btn(host(s), false, v -> openUrl(s)));
+        }
+    }
+
+    static String host(String u) {
+        try {
+            return Uri.parse(u).getHost();
+        } catch (Exception e) {
+            return u;
+        }
+    }
+
+    void openUrl(String u) {
+        try {
+            a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u)));
+        } catch (Exception e) {
+            a.toast("Impossible d'ouvrir le lien");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Matériel : câbles, kits, connecteurs
+    // ------------------------------------------------------------------
+    static String readAsset(Activity a, String name) {
+        try (InputStream in = a.getAssets().open(name)) {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] b = new byte[8192];
+            int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            return new String(bo.toByteArray(), "UTF-8");
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    void hardwareScreen(LinearLayout c) {
+        c.addView(a.tv("Pour brancher la tablette au téléphone : le téléphone doit être « hôte USB » (c'est le cas de presque tous). On y met un adaptateur, puis le câble de données de la tablette (le câble de charge d'origine du client convient en général).", 15, MainActivity.TEXT, false));
+        try {
+            JSONObject h = new JSONObject(readAsset(a, "hardware.json"));
+            JSONArray kits = h.optJSONArray("kits");
+            if (kits != null) for (int i = 0; i < kits.length(); i++) {
+                JSONObject k = kits.getJSONObject(i);
+                LinearLayout cd = a.card(MainActivity.ACCENT);
+                cd.addView(a.tv(k.optString("nom") + " : environ " + k.optString("prix_total_eur") + " €", 17, MainActivity.TEXT, true));
+                cd.addView(a.tv("Pour : " + k.optString("pour_qui"), 14, MainActivity.MUTED, false));
+                cd.addView(a.tv(k.optString("explication_simple"), 15, MainActivity.TEXT, false));
+                c.addView(cd);
+            }
+            JSONArray pr = h.optJSONArray("produits");
+            if (pr != null) {
+                c.addView(a.tv("Produits (liens)", 17, MainActivity.ACCENT, true));
+                for (int i = 0; i < pr.length(); i++) {
+                    JSONObject p = pr.getJSONObject(i);
+                    final String url = p.optString("url");
+                    boolean ok = p.optBoolean("verifie");
+                    String label = p.optString("nom") + "\n" + p.optString("prix_eur") + " € · " + p.optString("magasin") + (ok ? " · lien vérifié le " + p.optString("verifie_le") : " · page de recherche, non vérifiée");
+                    c.addView(a.btn(label, false, v -> openUrl(url)));
+                    String rq = p.optString("remarque");
+                    if (!rq.isEmpty()) c.addView(a.tv(rq, 13, MainActivity.MUTED, false));
+                }
+            }
+            JSONArray co = h.optJSONArray("tablettes_connecteurs");
+            if (co != null) {
+                c.addView(a.tv("Quel adaptateur selon la tablette", 17, MainActivity.ACCENT, true));
+                for (int i = 0; i < co.length(); i++) {
+                    JSONObject t = co.getJSONObject(i);
+                    c.addView(a.tv(t.optString("marque_gamme") + " : " + t.optString("connecteur") + " -> " + t.optString("adaptateur_necessaire"), 14, MainActivity.TEXT, false));
+                }
+            }
+        } catch (Exception e) {
+            c.addView(a.tv("Liste indisponible.", 15, MainActivity.TEXT, false));
+        }
+        c.addView(a.tv("Les prix et la disponibilité changent. Les liens marqués « non vérifiée » mènent à une recherche, pas à un produit précis.", 13, MainActivity.MUTED, false));
+    }
+
+    void brandsScreen(LinearLayout c) {
+        c.addView(a.tv("Informations par marque. « non confirmé » veut dire qu'aucune source fiable n'a été trouvée : rien n'est inventé.", 14, MainActivity.MUTED, false));
+        try {
+            JSONArray m = new JSONArray(readAsset(a, "marques.json"));
+            for (int i = 0; i < m.length(); i++) {
+                JSONObject o = m.getJSONObject(i);
+                LinearLayout k = a.card(0);
+                k.addView(a.tv(o.optString("marque"), 18, MainActivity.TEXT, true));
+                k.addView(a.tv(o.optString("explication_simple"), 15, MainActivity.TEXT, false));
+                k.addView(a.tv("Mode récupération : " + o.optString("touches_recuperation"), 14, MainActivity.MUTED, false));
+                k.addView(a.tv("Bootloader : " + o.optString("touches_bootloader"), 14, MainActivity.MUTED, false));
+                k.addView(a.tv("Système plus léger : " + o.optString("systeme_leger_possible"), 14, MainActivity.MUTED, false));
+                final String fw = o.optString("firmware_officiel");
+                if (fw.startsWith("http")) k.addView(a.btn("Site officiel du système", false, v -> openUrl(fw)));
+                c.addView(k);
+            }
+        } catch (Exception e) {
+            c.addView(a.tv("Liste indisponible.", 15, MainActivity.TEXT, false));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Mode enfant : 4 gros boutons
+    // ------------------------------------------------------------------
+    void simpleHome(LinearLayout c) {
+        refreshSituation();
+        LinearLayout k = a.card(situation.kind == Situation.ADB ? MainActivity.C_OK : MainActivity.C_WARN);
+        k.addView(a.tv(situation.title, 20, MainActivity.TEXT, true));
+        k.addView(a.tv(situation.text, 17, MainActivity.TEXT, false));
+        c.addView(k);
+        c.addView(a.btn("Que faire maintenant ?", true, v -> a.go("SITUATION")));
+        c.addView(a.btn("Sauver mes photos et vidéos", false, v -> a.go(a.link.isConnected() ? "BACKUP" : "CONNECT")));
+        c.addView(a.btn("Rendre la tablette plus rapide", false, v -> a.go(a.link.isConnected() ? "REPAIR" : "CONNECT")));
+        c.addView(a.btn("Chercher une solution", false, v -> openGuide("")));
+        c.addView(a.btn("Mode complet", false, v -> {
+            a.prefs.edit().putBoolean("simple", false).apply();
+            a.render();
+        }));
+    }
+}

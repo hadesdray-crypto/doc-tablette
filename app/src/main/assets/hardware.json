@@ -1,0 +1,754 @@
+{
+ "explications": [
+  {
+   "id": "cables-hote-peripherique",
+   "categorie": "Câbles et matériel",
+   "titre": "Hôte et périphérique : qui commande qui ?",
+   "resume": "Quand on relie deux appareils par USB, l'un est le chef (l'hôte) et l'autre obéit (le périphérique). Pour dépanner, le téléphone du réparateur doit être le chef et la tablette du client doit obéir.",
+   "niveau": "débutant",
+   "confiance": "haute",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Imagine une prise USB comme une poignée de main : un appareil tend la main en premier, c'est l'hôte.",
+    "L'hôte donne le courant et pose les questions. Le périphérique répond.",
+    "Un PC est toujours hôte. Une clé USB est toujours périphérique.",
+    "Notre téléphone doit être hôte, sinon il ne verra jamais la tablette.",
+    "Ce rôle s'appelle OTG (On-The-Go) : un téléphone qui peut jouer le rôle de chef."
+   ],
+   "attention": "Si les deux appareils veulent être chef, ou si les deux veulent obéir, rien ne se passe. Ce n'est pas une panne.",
+   "sources": [
+    "https://www.renesas.com/en/support/engineer-school/usb-power-delivery-03",
+    "https://www.elektroda.com/qa,powered-otg-phone-charging.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-otg-identification",
+   "categorie": "Câbles et matériel",
+   "titre": "Comment le téléphone sait qu'il doit être hôte (micro-USB)",
+   "resume": "Sur les anciennes prises micro-USB, une 5e broche appelée ID est reliée à la masse par le bout du câble OTG. Le téléphone sent ce contact et devient hôte.",
+   "niveau": "débutant",
+   "confiance": "haute",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Le câble OTG (prise USB-A femelle d'un côté, micro-USB mâle de l'autre) relie la broche ID à la masse dans sa fiche.",
+    "Le téléphone détecte ce lien et passe en mode hôte, puis envoie du courant 5 V.",
+    "Un câble sans cette liaison ne fonctionne pas : le téléphone reste simple périphérique.",
+    "Dans ce guide, on ne fabrique rien : on achète un câble marqué OTG."
+   ],
+   "attention": "Un simple adaptateur micro-USB vers USB-A de chargeur n'est pas OTG. Cherche le mot OTG sur la fiche produit.",
+   "sources": [
+    "https://www.elektroda.com/qa,powered-otg-phone-charging.html",
+    "https://www.ldlc.pro/fiche/PB00150664.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-usbc-usbc-qui-est-hote",
+   "categorie": "Câbles et matériel",
+   "titre": "USB-C vers USB-C : qui est l'hôte ?",
+   "resume": "En USB-C, deux fils CC décident des rôles avec des résistances. Entre deux appareils qui savent jouer les deux rôles, le téléphone et la tablette s'accordent, mais le résultat n'est pas toujours celui qu'on veut.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Un appareil « source » met une résistance de rappel (Rp) sur CC, un « récepteur » met 5,1 kilo-ohms (Rd).",
+    "Deux appareils sources ou deux récepteurs ne se détectent pas : pas de courant, pas de connexion.",
+    "Un appareil qui peut faire les deux (DRP) alterne entre les deux rôles jusqu'à trouver l'autre.",
+    "Les rôles de courant et de données peuvent être échangés par messages PD (Data Role Swap).",
+    "Essaie d'abord un câble USB-C vers USB-C simple. Si la tablette devient hôte au lieu du téléphone, utilise un adaptateur USB-A femelle avec le câble d'origine de la tablette : le sens est alors imposé."
+   ],
+   "attention": "C'est le point le plus capricieux. Le téléphone peut très bien charger la tablette sans jamais lire ses données. Si rien n'est détecté, ce n'est pas la faute de la tablette.",
+   "sources": [
+    "https://www.renesas.com/en/support/engineer-school/usb-power-delivery-03"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-rd-resistance",
+   "categorie": "Câbles et matériel",
+   "titre": "La petite résistance de 5,1 kilo-ohms",
+   "resume": "Un bon câble ou adaptateur USB-C contient une petite résistance de 5,1 kilo-ohms sur la broche CC. Elle dit « je suis un appareil à alimenter ». Sans elle, le téléphone ne comprend pas.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "faible",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Les adaptateurs de qualité ont cette résistance dedans, tu ne la vois pas.",
+    "Les adaptateurs très bon marché oublient parfois la bonne valeur : le téléphone ne réagit pas ou fournit trop de courant.",
+    "Préfère une marque connue (Ugreen, Anker, Baseus, Belkin, StarTech, Vention) plutôt qu'un lot sans nom.",
+    "Teste toujours un nouvel adaptateur sur un appareil de test avant le jour J."
+   ],
+   "attention": "Ne bricole pas les résistances toi-même. Un mauvais câble USB-C peut abîmer un appareil.",
+   "sources": [
+    "https://www.renesas.com/en/support/engineer-school/usb-power-delivery-03"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-donnees-vs-charge",
+   "categorie": "Câbles et matériel",
+   "titre": "Câble données ou câble de charge seule",
+   "resume": "Certains câbles ne transportent que le courant. Il faut un câble qui transporte aussi les données, sinon la tablette est chargée mais invisible.",
+   "niveau": "débutant",
+   "confiance": "haute",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Un câble de charge seule a seulement 2 fils : rouge (+) et noir (−).",
+    "Un câble données en a 4 en USB 2 (en plus : vert et blanc).",
+    "Test simple : branche le câble entre un téléphone et un ordinateur. Si le dossier des fichiers apparaît, c'est un câble données.",
+    "Fais un petit repère (ruban de couleur) sur les câbles testés bons.",
+    "Le câble d'origine de la tablette est en général un câble données, c'est le meilleur choix."
+   ],
+   "attention": "Les câbles de chargeurs « lumineux » ou très fins sont souvent charge seule. Amazon indique dans sa doc que, si la tablette n'apparaît pas, le câble est le premier suspect.",
+   "sources": [
+    "https://developer.amazon.com/docs/fire-tablets/connecting-adb-to-device.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-longueur",
+   "categorie": "Câbles et matériel",
+   "titre": "Quelle longueur de câble choisir",
+   "resume": "Plus court vaut mieux : 20 à 50 cm pour les adaptateurs, 1 mètre maximum pour le câble de la tablette.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Un câble long perd de la tension et de la vitesse de données.",
+    "Les adaptateurs OTG vendus font souvent 15 à 20 cm : c'est parfait.",
+    "Au-delà de 1,5 m, la tablette peut se déconnecter pendant une mise à jour.",
+    "Garde un câble de 1 m pour être à l'aise sur l'établi."
+   ],
+   "attention": "Évite les rallonges en série : plus de maillons, plus de risque de coupure.",
+   "sources": [
+    "https://www.ldlc.pro/fiche/PB00150664.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-usb2-usb3",
+   "categorie": "Câbles et matériel",
+   "titre": "USB 2 ou USB 3 : lequel il faut ?",
+   "resume": "Pour dépanner une tablette, USB 2 suffit largement (480 Mbit/s). Le USB 3 est inutile et peut même poser problème sur de vieilles tablettes.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "La plupart des tablettes à micro-USB sont en USB 2.",
+    "Le téléphone parle toujours à la vitesse du plus lent des deux.",
+    "Un hub USB 3 trop gourmand peut brouiller le Wi-Fi 2,4 GHz près de lui : éloigne-le de la tablette.",
+    "Ne dépense pas plus pour du 10 Gbit/s."
+   ],
+   "attention": "Un câble USB 3 épais est parfois moins souple et abîme les petites prises micro-USB. Préfère un câble souple.",
+   "sources": [
+    "https://www.ldlc.pro/fiche/PB00150664.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-alimentation-tablette",
+   "categorie": "Câbles et matériel",
+   "titre": "La tablette est alimentée par le téléphone : attention",
+   "resume": "Le téléphone hôte donne du courant à la tablette. Si la tablette est vide, elle peut vider le téléphone en quelques minutes.",
+   "niveau": "débutant",
+   "confiance": "haute",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "En mode OTG, le téléphone envoie du 5 V à l'appareil branché.",
+    "Une tablette avec batterie très vide appelle beaucoup de courant.",
+    "Le téléphone peut chauffer et perdre 1 % de batterie toutes les 2 ou 3 minutes.",
+    "Solution : charger la tablette d'abord avec son propre chargeur, ou utiliser un hub alimenté (fiche suivante).",
+    "Surveille le pourcentage du téléphone avant de commencer un long dépannage."
+   ],
+   "attention": "Ne laisse pas un téléphone à 10 % faire une réparation longue. Il peut s'éteindre au milieu d'une mise à jour de la tablette.",
+   "sources": [
+    "https://www.elektroda.com/qa,powered-otg-phone-charging.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-hub-alimente",
+   "categorie": "Câbles et matériel",
+   "titre": "Hub USB-C alimenté pour charger la tablette pendant la réparation",
+   "resume": "Un hub USB-C avec passage de courant (Power Delivery) a une prise pour le chargeur. Le téléphone reste hôte, la tablette est branchée sur le hub, et le chargeur alimente le tout.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "faible",
+   "perte_donnees": "aucune",
+   "necessite": "Hub USB-C PD, chargeur USB-C",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Branche le hub dans le téléphone (côté USB-C « host »).",
+    "Branche un chargeur USB-C dans la prise « PD » du hub.",
+    "Branche la tablette sur un port USB-A du hub avec son câble d'origine.",
+    "Contrôle sur 10 à 15 minutes : le pourcentage du téléphone monte-t-il, reste-t-il stable, ou descend-il ?"
+   ],
+   "attention": "Le fait que l'icône de charge s'affiche ne prouve rien. Un hub bon marché sans vraie fonction PD peut décharger le téléphone. Choisis une marque connue et vérifie la puissance de passage (60 à 100 W).",
+   "sources": [
+    "https://www.elektroda.com/qa,powered-otg-phone-charging.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-cable-y",
+   "categorie": "Câbles et matériel",
+   "titre": "Câble en Y ou OTG avec alimentation externe",
+   "resume": "Un câble OTG « powered » a une prise supplémentaire pour brancher un chargeur. Il alimente le périphérique, mais ne recharge pas forcément le téléphone.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "faible",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Le câble en Y a 3 bouts : un vers le téléphone, un vers la tablette, un vers le chargeur.",
+    "Il évite que la tablette tire son courant du téléphone.",
+    "Sur micro-USB, le téléphone ne se recharge généralement pas pendant qu'il est hôte.",
+    "Sur USB-C, le résultat dépend du téléphone."
+   ],
+   "attention": "« Powered OTG » est un terme marketing flou. Un Y bon marché peut renvoyer du courant dans le mauvais sens et chauffer.",
+   "sources": [
+    "https://www.elektroda.com/qa,powered-otg-phone-charging.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-power-share",
+   "categorie": "Câbles et matériel",
+   "titre": "Le câble « Power Share » : donner du courant du téléphone à la tablette",
+   "resume": "Certains câbles micro-USB vers micro-USB passent le courant du téléphone vers l'appareil branché (par exemple Delock 83570, environ 30 cm).",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "faible",
+   "perte_donnees": "aucune",
+   "necessite": "Câble Power Share Delock 83570",
+   "marques": "Delock",
+   "android": "Toutes versions",
+   "etapes": [
+    "Le téléphone doit avoir une prise micro-USB et supporter l'OTG.",
+    "L'appareil à alimenter n'a besoin que d'une prise micro-USB.",
+    "Ce câble sert à dépanner une tablette presque vide quand on n'a pas de prise électrique."
+   ],
+   "attention": "Ce câble ne convient pas à un téléphone USB-C tel quel. Il faut alors un adaptateur supplémentaire, et il vide le téléphone plus vite.",
+   "sources": [
+    "https://delock.com/produkt/83570/pdf.html?sprache=fr"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-adaptateur-microf-usbc",
+   "categorie": "Câbles et matériel",
+   "titre": "Adaptateur micro-USB femelle vers USB-C mâle",
+   "resume": "On le branche dans le téléphone USB-C : il lui donne une prise micro-USB femelle où brancher un câble OTG micro-USB. Il en existe à partir de 2,50 €.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Prends un modèle marqué OTG sur la fiche.",
+    "Branche l'adaptateur dans le téléphone.",
+    "Branche dedans le câble OTG micro-USB mâle vers USB-A femelle.",
+    "Branche le câble d'origine de la tablette dans la prise USB-A."
+   ],
+   "attention": "Il y a deux sens différents : femelle vers mâle ou mâle vers femelle. Regarde bien la fiche. Une fiche (Lindy chez Audiophonics) a un titre et un tableau de caractéristiques contradictoires.",
+   "sources": [
+    "https://www.audiophonics.fr/fr/cables-usb-hubs/cable-usb-c-vers-micro-usb-plaque-or-otg-20cm-p-13535.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-adaptateur-usba-femelle",
+   "categorie": "Câbles et matériel",
+   "titre": "Adaptateur USB-A femelle OTG (le plus pratique)",
+   "resume": "Un petit adaptateur USB-C mâle vers USB-A femelle permet d'utiliser le câble d'origine de la tablette, quel que soit son bout (micro-USB, 30 broches, mini-USB, etc.).",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Branche l'adaptateur dans le téléphone.",
+    "Branche le câble d'origine de la tablette (USB-A mâle) dedans.",
+    "Branche l'autre bout du câble dans la tablette.",
+    "Ouvre l'appli Doc Tablette."
+   ],
+   "attention": "Vérifie que l'adaptateur est marqué OTG ou données. Les pages Amazon n'ont pas pu être ouvertes lors de la recherche : les prix de cette catégorie sont des estimations.",
+   "sources": [
+    "https://www.ldlc.pro/fiche/PB00150664.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-microusb-usbc-tablette",
+   "categorie": "Câbles et matériel",
+   "titre": "Adaptateurs pour tablettes USB-C ou micro-USB côté tablette",
+   "resume": "Pour une tablette à prise USB-C, un câble USB-C vers USB-C simple (données, 1 m) suffit. Pour micro-USB, on passe par l'adaptateur USB-A femelle et le câble d'origine.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Tablette micro-USB : adaptateur USB-A femelle + câble d'origine.",
+    "Tablette USB-C : essaie d'abord câble USB-C vers USB-C données.",
+    "Tablette USB-C et rien ne se passe : adaptateur USB-A femelle + câble USB-A vers USB-C d'origine.",
+    "Tablette mini-USB : adaptateur USB-A femelle + câble USB-A vers mini-USB."
+   ],
+   "attention": "Le micro-USB B a un sens. Ne force jamais : tu risques de casser la prise de la tablette.",
+   "sources": [
+    "https://developer.amazon.com/docs/fire-tablets/connecting-adb-to-device.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-kit-multi-embouts",
+   "categorie": "Câbles et matériel",
+   "titre": "Kit multi-embouts : utile ou pas ?",
+   "resume": "Un kit avec un seul câble à embouts changeables est pratique pour la valise, mais plus fragile et souvent de charge seule. Garde-le en secours.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "faible",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Vérifie qu'il annonce « données » et pas seulement charge.",
+    "Teste-le chaque embout avec un téléphone avant de t'en servir chez un client.",
+    "Range les embouts dans une petite boîte : ils se perdent."
+   ],
+   "attention": "Un embout mal serré provoque des coupures pendant une mise à jour. Ne fais jamais une mise à jour système avec un câble douteux.",
+   "sources": [
+    "https://developer.amazon.com/docs/fire-tablets/connecting-adb-to-device.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-proprietaire-samsung-30",
+   "categorie": "Câbles et matériel",
+   "titre": "Tablettes Samsung à 30 broches",
+   "resume": "Les vieilles Samsung Galaxy Tab 1, 2, 3 et Note 10.1 ont une prise plate à 30 broches. On n'achète pas d'adaptateur spécial : on utilise le câble d'origine du client.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Demande au client son câble USB-A vers 30 broches.",
+    "Branche-le sur l'adaptateur USB-A femelle du téléphone.",
+    "Attention : l'adaptateur StarTech SDCOTG (30 broches vers USB-A femelle) fait l'inverse, il rend la tablette hôte. Ce n'est pas ce qu'on veut ici."
+   ],
+   "attention": "Le StarTech SDCOTG était affiché « Stock épuisé » chez Pixmania. Inutile de le chercher pour ce cas.",
+   "sources": [
+    "https://www.pixmania.com/fr/fr/startechcom-cable-usb-otg-samsung-galaxy-tab-adaptateur-otg-usb-type-a-femelle-1-metre-285787.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-proprietaire-autres",
+   "categorie": "Câbles et matériel",
+   "titre": "Autres connecteurs propriétaires (Lenovo, Asus, Acer)",
+   "resume": "Certaines tablettes ont une prise de charge ronde ou plate spéciale, mais la transmission des données passe souvent par un micro-USB séparé. Demande toujours le câble d'origine.",
+   "niveau": "débutant",
+   "confiance": "faible",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Regarde la tablette : il y a souvent deux prises, une pour le chargeur et une micro-USB.",
+    "Si une seule prise spéciale existe, il faut son câble d'origine.",
+    "Ne commande jamais un câble « équivalent » sans la référence exacte de la tablette."
+   ],
+   "attention": "Pour ce point, la liste des modèles est donnée de mémoire et n'a pas été vérifiée sur des fiches constructeur.",
+   "sources": [
+    "https://developer.amazon.com/docs/fire-tablets/connecting-adb-to-device.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-amazon-fire",
+   "categorie": "Câbles et matériel",
+   "titre": "Tablettes Amazon Fire",
+   "resume": "Les anciennes Fire (micro-USB) se dépannent avec un câble micro-USB données. Passer en mode transfert de fichiers (MTP) et activer le débogage USB.",
+   "niveau": "débutant",
+   "confiance": "haute",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Réglages > Options de l'appareil > À propos : touche 7 fois le numéro de série.",
+    "Retour dans Options de l'appareil > Options pour les développeurs : active le débogage USB.",
+    "Branche la tablette et accepte « Autoriser le débogage USB ».",
+    "Si la tablette n'apparaît pas, essaie un autre câble."
+   ],
+   "attention": "En mode photo (PTP), la tablette n'est pas reconnue : choisis transfert de fichiers.",
+   "sources": [
+    "https://developer.amazon.com/docs/fire-tablets/connecting-adb-to-device.html"
+   ],
+   "langue_source": "en"
+  },
+  {
+   "id": "cables-tests-avant",
+   "categorie": "Câbles et matériel",
+   "titre": "Tester ses câbles avant d'aller chez un client",
+   "resume": "Un jour de repos, passe chaque câble au banc d'essai : câble, adaptateur, hub. Note ceux qui marchent et colle une étiquette.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "aucun",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Branche chaque câble sur ton téléphone et sur un PC pour voir si les données passent.",
+    "Teste chaque adaptateur avec une tablette ou une clé USB.",
+    "Teste le hub avec le chargeur : le téléphone doit rester stable.",
+    "Écris le résultat sur un bout de ruban collé sur le câble."
+   ],
+   "attention": "Un câble qui marche « presque » est pire qu'un câble cassé : jette-le.",
+   "sources": [
+    "https://developer.amazon.com/docs/fire-tablets/connecting-adb-to-device.html"
+   ],
+   "langue_source": "fr"
+  },
+  {
+   "id": "cables-securite-courant",
+   "categorie": "Câbles et matériel",
+   "titre": "Sécurité : ne pas casser le téléphone ou la tablette",
+   "resume": "Un mauvais câble ou un adaptateur trop bon marché peut chauffer ou envoyer du courant dans le mauvais sens.",
+   "niveau": "débutant",
+   "confiance": "moyenne",
+   "risque": "moyen",
+   "perte_donnees": "aucune",
+   "necessite": "Aucun matériel",
+   "marques": "Toutes",
+   "android": "Toutes versions",
+   "etapes": [
+    "Si un câble chauffe, débranche tout de suite.",
+    "Utilise des chargeurs de marque.",
+    "Ne branche jamais deux chargeurs en même temps sur la même tablette.",
+    "Évite les câbles abîmés, gonflés ou pliés."
+   ],
+   "attention": "En cas d'odeur de brûlé ou de gonflement de la batterie, arrête et éloigne l'appareil de tout objet inflammable.",
+   "sources": [
+    "https://www.elektroda.com/qa,powered-otg-phone-charging.html"
+   ],
+   "langue_source": "en"
+  }
+ ],
+ "produits": [
+  {
+   "nom": "Adaptateur OTG Micro-USB femelle vers USB-C mâle (Audiophonics réf. 12707)",
+   "usage": "Donne une prise micro-USB femelle au téléphone USB-C pour brancher un câble OTG micro",
+   "prix_eur": 2.5,
+   "magasin": "Audiophonics",
+   "url": "https://www.audiophonics.fr/fr/adaptateurs-usb/adaptateur-otg-micro-usb-femelle-vers-usb-c-male-p-12707.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : OTG indiqué, derniers articles en stock."
+  },
+  {
+   "nom": "Câble USB 2.0 OTG USB-A femelle / micro-USB mâle 20 cm",
+   "usage": "Câble OTG classique : on y branche le câble d'origine de la tablette",
+   "prix_eur": 3.9,
+   "magasin": "LDLC.pro",
+   "url": "https://www.ldlc.pro/fiche/PB00150664.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : en stock, 3,90 € TTC plus 0,05 € d'éco-contribution."
+  },
+  {
+   "nom": "StarTech UUSBOTG - micro-USB B mâle / USB-A femelle OTG",
+   "usage": "Même usage, marque StarTech",
+   "prix_eur": 7.9,
+   "magasin": "LDLC.pro",
+   "url": "https://www.ldlc.pro/fiche/PB00265079.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : en stock, 7,90 € TTC."
+  },
+  {
+   "nom": "StarTech UUUSBOTG8IN - câble OTG micro-USB / micro-USB M/M 20 cm",
+   "usage": "Relier un téléphone micro-USB à une tablette micro-USB",
+   "prix_eur": 7.94,
+   "magasin": "LDLC.pro",
+   "url": "https://www.ldlc.pro/fiche/PB00240510.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : indiqué en rupture au 2026-11-05."
+  },
+  {
+   "nom": "Adaptateur USB-C mâle vers micro-USB B femelle Vention CDXB0",
+   "usage": "Permet de brancher un câble micro-USB sur une prise USB-C",
+   "prix_eur": 2.63,
+   "magasin": "PCComponentes",
+   "url": "https://www.pccomponentes.fr/adaptateur-vention-cdxb0-usb-c-male-vers-micro-usb-femelle-nickel-noir",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : livraison annoncée 13 à 20 novembre."
+  },
+  {
+   "nom": "Blue Star adaptateur OTG Micro-USB femelle vers USB-C mâle",
+   "usage": "Même usage que l'Audiophonics, plus cher",
+   "prix_eur": 17.99,
+   "magasin": "LDLC",
+   "url": "https://www.ldlc.com/fiche/PB00745408.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : vendu par Destock Access, en stock. Cher pour ce que c'est."
+  },
+  {
+   "nom": "Bluestar adaptateur OTG Micro-USB femelle vers USB-C mâle (réf. 9001054796)",
+   "usage": "Même usage",
+   "prix_eur": 10.91,
+   "magasin": "Boulanger",
+   "url": "https://www.boulanger.com/ref/9001054796",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : prix lu 10,91 €."
+  },
+  {
+   "nom": "LINDY adaptateur micro-USB / USB-C",
+   "usage": "Adaptateur de marque connue",
+   "prix_eur": 5.91,
+   "magasin": "Audiophonics",
+   "url": "https://www.audiophonics.fr/fr/adaptateurs-usb/lindy-adaptateur-micro-usb-male-vers-usb-c-femelle-p-16534.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte, mais titre (mâle vers femelle) et tableau (USB-C mâle + micro femelle) se contredisent : vérifier avant d'acheter."
+  },
+  {
+   "nom": "XO adaptateur USB-C femelle vers micro-USB mâle NB256H",
+   "usage": "Brancher un câble USB-C sur une prise micro-USB",
+   "prix_eur": 17.99,
+   "magasin": "LDLC",
+   "url": "https://www.ldlc.com/fr-be/fiche/PB00646551.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : très cher pour ce qui est vendu, sens inverse de l'usage principal."
+  },
+  {
+   "nom": "Câble Power Share Delock 83570 micro-USB OTG vers micro-USB 30 cm",
+   "usage": "Le téléphone micro-USB alimente la tablette",
+   "prix_eur": 0,
+   "magasin": "Delock (fabricant)",
+   "url": "https://delock.com/produkt/83570/pdf.html?sprache=fr",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : fiche technique sans prix. prix_eur à 0 = inconnu."
+  },
+  {
+   "nom": "Câble USB-C vers micro-USB OTG 20 cm plaqué or (Audiophonics réf. 13535)",
+   "usage": "Câble direct USB-C vers micro-USB",
+   "prix_eur": 6.9,
+   "magasin": "Audiophonics",
+   "url": "https://www.audiophonics.fr/fr/cables-usb-hubs/cable-usb-c-vers-micro-usb-plaque-or-otg-20cm-p-13535.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : produit indiqué définitivement arrêté. OTG ok seulement si le côté USB-C est hôte."
+  },
+  {
+   "nom": "StarTech SDCOTG - câble OTG Samsung Galaxy Tab 30 broches vers USB-A femelle",
+   "usage": "Rend une Samsung Tab 30 broches hôte : PAS notre cas",
+   "prix_eur": 0,
+   "magasin": "Pixmania",
+   "url": "https://www.pixmania.com/fr/fr/startechcom-cable-usb-otg-samsung-galaxy-tab-adaptateur-otg-usb-type-a-femelle-1-metre-285787.html",
+   "verifie_le": "2026-11-05",
+   "verifie": true,
+   "remarque": "Page ouverte : stock épuisé, prix absent. À ne pas acheter pour dépanner."
+  },
+  {
+   "nom": "Adaptateur USB-C mâle vers USB-A femelle OTG (Ugreen, Baseus, Anker)",
+   "usage": "Le plus pratique : on y branche le câble d'origine de la tablette",
+   "prix_eur": 6,
+   "magasin": "Amazon.fr (page de recherche)",
+   "url": "https://www.amazon.fr/s?k=adaptateur+usb-c+male+vers+usb-a+femelle+otg",
+   "verifie_le": "2026-11-05",
+   "verifie": false,
+   "remarque": "Amazon bloque la lecture des pages : lien de recherche, non vérifié. Vu dans les résultats : Ugreen pack de 3, USB 3.2 (B0CY1Y3TSQ). Prix estimé."
+  },
+  {
+   "nom": "Hub USB-C alimenté avec Power Delivery 100 W, ports USB-A (Anker, Ugreen, Baseus, Belkin)",
+   "usage": "Garder le téléphone hôte et charger la tablette",
+   "prix_eur": 30,
+   "magasin": "Amazon.fr (page de recherche)",
+   "url": "https://www.amazon.fr/s?k=hub+usb-c+power+delivery+100w+usb-a+5+en+1",
+   "verifie_le": "2026-11-05",
+   "verifie": false,
+   "remarque": "Non vérifié. Vu dans les résultats : Anker 5-en-1, 100 W (B0DKT8BB4M), page non ouvrable. Prix estimé."
+  },
+  {
+   "nom": "Câble USB-C vers USB-C données 1 m (Anker, Ugreen, Baseus)",
+   "usage": "Tablettes USB-C",
+   "prix_eur": 8,
+   "magasin": "Amazon.fr (page de recherche)",
+   "url": "https://www.amazon.fr/s?k=cable+usb-c+vers+usb-c+1m+donn%C3%A9es+480mbps",
+   "verifie_le": "2026-11-05",
+   "verifie": false,
+   "remarque": "Non vérifié. Prix estimé."
+  },
+  {
+   "nom": "Câble micro-USB vers USB-A données 1 m (Ugreen, Anker)",
+   "usage": "Secours si le client n'a pas son câble",
+   "prix_eur": 5,
+   "magasin": "Amazon.fr (page de recherche)",
+   "url": "https://www.amazon.fr/s?k=cable+micro+usb+donn%C3%A9es+1m+ugreen",
+   "verifie_le": "2026-11-05",
+   "verifie": false,
+   "remarque": "Non vérifié. Prix estimé."
+  },
+  {
+   "nom": "Kit multi-embouts de câbles (micro-USB, mini-USB, USB-C)",
+   "usage": "Secours dans la valise",
+   "prix_eur": 12,
+   "magasin": "Amazon.fr (page de recherche)",
+   "url": "https://www.amazon.fr/s?k=cable+multi+embouts+usb+donn%C3%A9es",
+   "verifie_le": "2026-11-05",
+   "verifie": false,
+   "remarque": "Non vérifié, vérifier qu'il est de type données. Prix estimé."
+  }
+ ],
+ "kits": [
+  {
+   "nom": "Kit minimum",
+   "pour_qui": "Débutant, tablettes avec prise micro-USB",
+   "contenu": [
+    "Adaptateur OTG Micro-USB femelle vers USB-C mâle (Audiophonics réf. 12707)",
+    "Câble USB 2.0 OTG USB-A femelle / micro-USB mâle 20 cm"
+   ],
+   "prix_total_eur": 6.4,
+   "explication_simple": "Deux petites pièces vérifiées en magasin (6,40 € en tout) : l'adaptateur donne une prise micro-USB au téléphone, le câble OTG donne une prise USB-A. On y branche le câble d'origine de la tablette. La tablette doit déjà avoir un peu de batterie."
+  },
+  {
+   "nom": "Kit complet réparateur",
+   "pour_qui": "Réparateur régulier",
+   "contenu": [
+    "Adaptateur OTG Micro-USB femelle vers USB-C mâle (Audiophonics réf. 12707)",
+    "Câble USB 2.0 OTG USB-A femelle / micro-USB mâle 20 cm",
+    "Adaptateur USB-C mâle vers USB-A femelle OTG (Ugreen, Baseus, Anker)",
+    "Hub USB-C alimenté avec Power Delivery 100 W, ports USB-A (Anker, Ugreen, Baseus, Belkin)",
+    "Câble USB-C vers USB-C données 1 m (Anker, Ugreen, Baseus)",
+    "StarTech UUSBOTG - micro-USB B mâle / USB-A femelle OTG",
+    "Adaptateur USB-C mâle vers micro-USB B femelle Vention CDXB0",
+    "Câble micro-USB vers USB-A données 1 m (Ugreen, Anker)"
+   ],
+   "prix_total_eur": 65.93,
+   "explication_simple": "Le kit minimum, plus un adaptateur USB-A femelle direct, un hub USB-C alimenté pour charger la tablette, un câble USB-C, un câble OTG StarTech et un adaptateur Vention. Seulement 16,93 € des prix sont vérifiés ; le hub (30 €), l'adaptateur A femelle (6 €), le câble USB-C (8 €) et le câble micro-USB (5 €) sont des estimations : Amazon n'a pas pu être ouvert."
+  },
+  {
+   "nom": "Kit pour tablettes à connecteur propriétaire",
+   "pour_qui": "Vieilles Samsung 30 broches, Lenovo, Acer, Asus",
+   "contenu": [
+    "Adaptateur USB-C mâle vers USB-A femelle OTG (Ugreen, Baseus, Anker)",
+    "Câble micro-USB vers USB-A données 1 m (Ugreen, Anker)",
+    "Kit multi-embouts de câbles (micro-USB, mini-USB, USB-C)"
+   ],
+   "prix_total_eur": 23,
+   "explication_simple": "Pour une prise spéciale, on n'achète pas d'adaptateur : on utilise le câble d'origine du client et on le branche dans l'adaptateur USB-A femelle du téléphone. Le câble micro-USB et le kit multi-embouts sont des secours. Prix estimés, non vérifiés."
+  }
+ ],
+ "tablettes_connecteurs": [
+  {
+   "marque_gamme": "Samsung Galaxy Tab 1, 2, 3, Note 10.1 (anciennes)",
+   "connecteur": "30 broches Samsung",
+   "adaptateur_necessaire": "Câble d'origine USB-A vers 30 broches du client, plus adaptateur USB-A femelle sur le téléphone",
+   "confiance": "moyenne"
+  },
+  {
+   "marque_gamme": "Samsung Galaxy Tab A, E, S2 (selon année)",
+   "connecteur": "micro-USB ou USB-C selon le modèle",
+   "adaptateur_necessaire": "Adaptateur USB-A femelle et câble d'origine",
+   "confiance": "moyenne"
+  },
+  {
+   "marque_gamme": "Amazon Fire (modèles anciens)",
+   "connecteur": "micro-USB",
+   "adaptateur_necessaire": "Adaptateur USB-A femelle et câble micro-USB données",
+   "confiance": "haute"
+  },
+  {
+   "marque_gamme": "Amazon Fire (modèles récents)",
+   "connecteur": "USB-C",
+   "adaptateur_necessaire": "Câble USB-C vers USB-C données, sinon adaptateur A femelle",
+   "confiance": "moyenne"
+  },
+  {
+   "marque_gamme": "Archos",
+   "connecteur": "micro-USB, parfois mini-USB selon le modèle",
+   "adaptateur_necessaire": "Adaptateur USB-A femelle et câble d'origine",
+   "confiance": "moyenne"
+  },
+  {
+   "marque_gamme": "Lenovo Tab, Yoga Tablet",
+   "connecteur": "micro-USB ou USB-C (certains modèles ont aussi une prise de charge spéciale)",
+   "adaptateur_necessaire": "Adaptateur USB-A femelle et câble d'origine",
+   "confiance": "faible"
+  },
+  {
+   "marque_gamme": "Asus Memo Pad, ZenPad, Transformer Pad",
+   "connecteur": "micro-USB, USB-C ou connecteur dock propriétaire",
+   "adaptateur_necessaire": "Câble d'origine plus adaptateur A femelle",
+   "confiance": "faible"
+  },
+  {
+   "marque_gamme": "Acer Iconia",
+   "connecteur": "micro-USB, parfois prise de charge séparée",
+   "adaptateur_necessaire": "Adaptateur USB-A femelle et câble micro-USB",
+   "confiance": "faible"
+  },
+  {
+   "marque_gamme": "Huawei MediaPad",
+   "connecteur": "micro-USB ou USB-C",
+   "adaptateur_necessaire": "Adaptateur USB-A femelle et câble d'origine",
+   "confiance": "faible"
+  }
+ ],
+ "notes": "Liens non Amazon ouverts et lus le 2026-11-05. Amazon.fr bloque WebFetch (robots) : liens Amazon = pages de recherche non vérifiées. Quota de recherche épuisé après environ 14 recherches."
+}

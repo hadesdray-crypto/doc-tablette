@@ -2,4 +2,8 @@
 <resources>
     <!-- Interface ADB : classe 255, sous-classe 66, protocole 1 -->
     <usb-device class="255" subclass="66" protocol="1" />
+    <!-- Mode bootloader (fastboot) : protocole 3 -->
+    <usb-device class="255" subclass="66" protocol="3" />
+    <!-- Tablette branchée comme appareil photo / transfert de fichiers (PTP, MTP) -->
+    <usb-device class="6" subclass="1" />
 </resources>

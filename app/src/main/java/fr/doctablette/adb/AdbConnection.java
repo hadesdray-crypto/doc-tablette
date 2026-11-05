@@ -185,13 +185,27 @@ public final class AdbConnection {
         void sent(long bytes);
     }
 
+    /** Tant que des données arrivent, le délai se prolonge de ce temps (utile pour les gros fichiers). */
+    private long idleExtend = 0;
+
+    public void setIdleExtend(long ms) {
+        this.idleExtend = ms;
+    }
+
     private Progress progress;
 
     public void setProgress(Progress p) {
         this.progress = p;
     }
 
-    public synchronized byte[] run(String service, InputStream stdin, int unused, long timeoutMs) throws IOException {
+    public byte[] run(String service, InputStream stdin, int unused, long timeoutMs) throws IOException {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        stream(service, stdin, bo, timeoutMs);
+        return bo.toByteArray();
+    }
+
+    /** Comme run, mais la sortie va directement dans un flux (photos, vidéos : pas de limite de taille en mémoire). */
+    public synchronized void stream(String service, InputStream stdin, java.io.OutputStream out, long timeoutMs) throws IOException {
         if (closed) throw new IOException("Pas de connexion");
         final int local = nextLocal++;
         byte[] svc = service.getBytes(StandardCharsets.UTF_8);
@@ -199,7 +213,6 @@ public final class AdbConnection {
         System.arraycopy(svc, 0, svcz, 0, svc.length);
         send(A_OPEN, local, 0, svcz, svcz.length);
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
         long deadline = System.currentTimeMillis() + timeoutMs;
         int remote = 0;
         boolean opened = false, writeReady = false, stdinDone = stdin == null;
@@ -233,11 +246,12 @@ public final class AdbConnection {
                 writeReady = true;
             } else if (m.cmd == A_WRTE && m.arg1 == local) {
                 out.write(m.data, 0, m.data.length);
+                deadline = Math.max(deadline, System.currentTimeMillis() + idleExtend);
                 send(A_OKAY, local, m.arg0, new byte[0], 0);
             } else if (m.cmd == A_CLSE && m.arg1 == local) {
                 if (!opened) throw new IOException("Commande refusée par la tablette");
                 send(A_CLSE, local, m.arg0, new byte[0], 0);
-                return out.toByteArray();
+                return;
             } else if (m.cmd == A_CLSE && m.arg1 == 0 && !opened) {
                 throw new IOException("Commande refusée par la tablette");
             }

@@ -108,6 +108,7 @@ public class MainActivity extends Activity {
     TextView connectStatus, repairLogView, updStatusView;
     ProgressBar updBar;
     EditText wifiField;
+    ExtraScreens extra;
 
     // =====================================================================
     // Cycle de vie
@@ -117,6 +118,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         prefs = getSharedPreferences("dt", MODE_PRIVATE);
         usb = (UsbManager) getSystemService(USB_SERVICE);
+        extra = new ExtraScreens(this);
         IntentFilter f = new IntentFilter();
         f.addAction(ACTION_USB_PERM);
         f.addAction(ACTION_INSTALL);
@@ -213,6 +215,13 @@ public class MainActivity extends Activity {
             case "LEGAL": return "Informations légales";
             case "APPUPDATE": return "Mettre à jour Doc Tablette";
             case "FIRST": return "Comment ça marche";
+            case "SITUATION": return "Que faire maintenant ?";
+            case "BACKUP": return "Sauvegarder photos et vidéos";
+            case "GUIDE": return "Guide de dépannage";
+            case "GUIDELIST": return "Guide";
+            case "CARD": return "Fiche";
+            case "HARDWARE": return "Câbles et matériel";
+            case "BRANDS": return "Marques";
             default: return "Doc Tablette";
         }
     }
@@ -355,6 +364,13 @@ public class MainActivity extends Activity {
             case "LEGAL": legalScreen(c); break;
             case "APPUPDATE": appUpdateScreen(c); break;
             case "FIRST": firstScreen(c); break;
+            case "SITUATION": extra.situationScreen(c); break;
+            case "BACKUP": extra.backupScreen(c); break;
+            case "GUIDE": extra.guideScreen(c); break;
+            case "GUIDELIST": extra.guideListScreen(c); break;
+            case "CARD": extra.cardScreen(c); break;
+            case "HARDWARE": extra.hardwareScreen(c); break;
+            case "BRANDS": extra.brandsScreen(c); break;
             default: homeScreen(c);
         }
         setContentView(root);
@@ -389,6 +405,10 @@ public class MainActivity extends Activity {
     // Accueil
     // =====================================================================
     void homeScreen(LinearLayout c) {
+        if (prefs.getBoolean("simple", false)) {
+            extra.simpleHome(c);
+            return;
+        }
         c.addView(tv("Réparez et mettez à jour une tablette Android, par le câble.", 16, MUTED, false));
         LinearLayout k = card(link.isConnected() ? C_OK : 0);
         k.addView(tv(link.isConnected() ? "Tablette connectée" : "Aucune tablette connectée", 17, link.isConnected() ? C_OK : TEXT, true));
@@ -405,6 +425,13 @@ public class MainActivity extends Activity {
         } else {
             c.addView(btn("Connecter la tablette", true, v -> go("CONNECT")));
         }
+        c.addView(btn("Que faire maintenant ? (détection)", false, v -> go("SITUATION")));
+        c.addView(btn("Sauvegarder photos et vidéos", false, v -> go("BACKUP")));
+        c.addView(btn("Guide de dépannage et recherche", false, v -> go("GUIDE")));
+        c.addView(btn("Mode simple (très facile)", false, v -> {
+            prefs.edit().putBoolean("simple", true).apply();
+            render();
+        }));
         c.addView(btn("Tout réparer", false, v -> go("REPAIR")));
         c.addView(btn("Applis de la tablette", false, v -> go("APPS")));
         c.addView(btn("Mises à jour", false, v -> go("UPDATES")));
@@ -435,9 +462,15 @@ public class MainActivity extends Activity {
     void handleIntent(Intent i) {
         if (i == null || !UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(i.getAction())) return;
         UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-        if (d != null && UsbAdbChannel.hasAdbInterface(d)) {
+        if (d == null) return;
+        if (UsbAdbChannel.hasAdbInterface(d)) {
             if (!top().equals("CONNECT")) stack.add("CONNECT");
             scanUsb(true);
+            render();
+        } else {
+            // fastboot, transfert de fichiers, mode bas niveau… : on explique quoi faire
+            if (!top().equals("SITUATION")) stack.add("SITUATION");
+            scanUsb(false);
             render();
         }
     }
@@ -499,6 +532,7 @@ public class MainActivity extends Activity {
             ui.post(() -> {
                 connecting = false;
                 connectMsg = m;
+                extra.authRefused = m.contains("Autorisation refusée");
                 render();
             });
         }
@@ -967,6 +1001,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == ExtraScreens.REQ_TREE && res == RESULT_OK && data != null) {
+            extra.onTree(data.getData());
+            return;
+        }
         if (req == REQ_APK && res == RESULT_OK && data != null && data.getData() != null) installApk(data.getData());
     }
 
