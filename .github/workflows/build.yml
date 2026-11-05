@@ -1,0 +1,98 @@
+name: Construire l'APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Tests du protocole ADB et de la logique
+        run: |
+          mkdir -p out
+          javac -encoding UTF-8 -d out app/src/main/java/fr/doctablette/adb/Adb{Channel,Crypto,Connection}.java app/src/main/java/fr/doctablette/logic/*.java protocol-test/*.java
+          java -Dfile.encoding=UTF-8 -cp out FakeAdbTest
+          java -Dfile.encoding=UTF-8 -cp out LogicTest
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Clé de signature et secrets (tout dérive d'une seule valeur)
+        env:
+          SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
+        run: |
+          test -n "$SIGNING_PASSPHRASE"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:SIGNING_PASSPHRASE -in signing/doc-tablette.jks.enc -out "$RUNNER_TEMP/release.jks"
+          D() { printf '%s' "$1:$SIGNING_PASSPHRASE" | sha256sum | cut -c1-32; }
+          echo "::add-mask::$(D ks)"
+          echo "::add-mask::$(D licence)"
+          echo "KS_PASS=$(D ks)" >> "$GITHUB_ENV"
+          echo "LIC_SECRET=$(D licence)" >> "$GITHUB_ENV"
+
+      - name: Compiler l'APK signée
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+          LICENSE_SECRET: ${{ env.LIC_SECRET }}
+          KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ env.KS_PASS }}
+          KEY_ALIAS: doctablette
+          KEY_PASSWORD: ${{ env.KS_PASS }}
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Vérifier la signature
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" | head -3
+          cp "$APK" doc-tablette.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doc-tablette-apk
+          path: doc-tablette.apk
+
+      - name: Publier la version (mise à jour sur place)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.run_number }}
+        run: |
+          python3 tools/make_update_json.py "$N" "1.0.$N" "https://github.com/${{ github.repository }}/releases/download/v$N/doc-tablette.apk" doc-tablette.apk release-notes.txt > update.json
+          cat update.json
+          gh release create "v$N" doc-tablette.apk update.json --title "Doc Tablette 1.0.$N" --notes-file release-notes.txt --latest
+
+  emulateur:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: doc-tablette-apk
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test sur téléphone virtuel
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: bash tools/smoke_test.sh doc-tablette.apk

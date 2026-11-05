@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+def env = { String k, String d -> System.getenv(k) ?: d }
+
+android {
+    namespace 'fr.doctablette'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'fr.doctablette.app'
+        minSdk 26
+        targetSdk 34
+        versionCode env('VERSION_CODE', '1').toInteger()
+        versionName env('VERSION_NAME', '1.0.0')
+        buildConfigField 'String', 'LICENSE_SECRET', "\"${env('LICENSE_SECRET', 'secret-local-de-test')}\""
+        buildConfigField 'String', 'UPDATE_URL', "\"https://github.com/hadesdray-crypto/doc-tablette/releases/latest/download/update.json\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv('KEYSTORE_FILE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('KEYSTORE_FILE') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        encoding 'UTF-8'
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+    }
+}

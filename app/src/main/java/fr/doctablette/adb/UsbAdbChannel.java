@@ -1,0 +1,95 @@
+package fr.doctablette.adb;
+
+import android.hardware.usb.UsbConstants;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
+import android.hardware.usb.UsbManager;
+
+import java.io.IOException;
+
+/** Canal ADB par le câble USB : le téléphone joue le rôle d'ordinateur. */
+public final class UsbAdbChannel implements AdbChannel {
+    private final UsbDeviceConnection conn;
+    private final UsbInterface intf;
+    private final UsbEndpoint in, out;
+    private volatile boolean closed;
+
+    public static boolean hasAdbInterface(UsbDevice d) {
+        return findInterface(d) != null;
+    }
+
+    static UsbInterface findInterface(UsbDevice d) {
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface f = d.getInterface(i);
+            if (f.getInterfaceClass() == 255 && f.getInterfaceSubclass() == 66 && f.getInterfaceProtocol() == 1) return f;
+        }
+        return null;
+    }
+
+    public UsbAdbChannel(UsbManager mgr, UsbDevice dev) throws IOException {
+        intf = findInterface(dev);
+        if (intf == null) throw new IOException("Cette connexion USB n'est pas en mode débogage");
+        UsbEndpoint ei = null, eo = null;
+        for (int i = 0; i < intf.getEndpointCount(); i++) {
+            UsbEndpoint e = intf.getEndpoint(i);
+            if (e.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                if (e.getDirection() == UsbConstants.USB_DIR_IN) ei = e;
+                else eo = e;
+            }
+        }
+        if (ei == null || eo == null) throw new IOException("Port USB incomplet");
+        in = ei;
+        out = eo;
+        conn = mgr.openDevice(dev);
+        if (conn == null) throw new IOException("Accès USB non accordé");
+        if (!conn.claimInterface(intf, true)) {
+            conn.close();
+            throw new IOException("Port USB occupé par une autre appli");
+        }
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+        int done = 0;
+        while (done < len) {
+            int n = Math.min(16384, len - done);
+            int r = conn.bulkTransfer(out, b, off + done, n, 5000);
+            if (r < 0) {
+                closed = true;
+                throw new IOException("Écriture USB impossible");
+            }
+            done += r;
+        }
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len, int timeoutMs) {
+        if (closed) return -1;
+        long t0 = System.currentTimeMillis();
+        int r = conn.bulkTransfer(in, b, off, Math.min(len, 16384), timeoutMs);
+        if (r >= 0) return r;
+        // Échec : délai normal, ou câble débranché si l'échec est immédiat
+        if (System.currentTimeMillis() - t0 < Math.min(timeoutMs, 200) / 2 + 20 && timeoutMs > 100) {
+            closed = true;
+            return -1;
+        }
+        return 0;
+    }
+
+    @Override
+    public int maxChunk() {
+        return 16384;
+    }
+
+    @Override
+    public void close() {
+        closed = true;
+        try {
+            conn.releaseInterface(intf);
+        } catch (Exception ignored) {
+        }
+        conn.close();
+    }
+}
