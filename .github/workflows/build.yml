@@ -58,7 +58,9 @@ jobs:
       - name: Vérifier la signature
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" | head -3
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" > sig.txt
+          head -3 sig.txt
           cp "$APK" doc-tablette.apk
 
       - uses: actions/upload-artifact@v4

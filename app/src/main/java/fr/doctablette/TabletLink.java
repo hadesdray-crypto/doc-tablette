@@ -42,6 +42,13 @@ final class TabletLink {
         if (c != null) c.close();
     }
 
+    /** Envoie un flux à une commande exec: (utilisé par les tests). */
+    String execIn(String cmd, java.io.InputStream in, long timeoutMs) throws IOException {
+        AdbConnection c = cx;
+        if (c == null || c.isClosed()) throw new IOException("Tablette débranchée");
+        return c.execWithInput(cmd, in, timeoutMs);
+    }
+
     String sh(String cmd, long timeoutMs) throws IOException {
         AdbConnection c = cx;
         if (c == null || c.isClosed()) throw new IOException("Tablette débranchée");
@@ -99,7 +106,7 @@ final class TabletLink {
         cx = c;
         String model = "", serial = "";
         try {
-            model = c.shell("getprop ro.product.manufacturer; getprop ro.product.model", 8000).trim().replace('\n', ' ');
+            model = c.shell("getprop ro.product.manufacturer; getprop ro.product.model", 8000).replace("\r", "").trim().replace('\n', ' ');
             serial = c.shell("getprop ro.serialno", 5000).trim();
         } catch (IOException ignored) {
         }
@@ -110,7 +117,7 @@ final class TabletLink {
 
     static String explain(Exception e) {
         String m = e == null || e.getMessage() == null ? "" : e.getMessage();
-        if (m.contains("refusée")) return "Autorisation refusée sur la tablette. Débranchez, rebranchez, et touchez « Autoriser ».";
+        if (m.contains("Autorisation refusée")) return "Autorisation refusée sur la tablette. Débranchez, rebranchez, et touchez « Autoriser ».";
         if (m.contains("ne répond pas")) return "La tablette ne répond pas. Vérifiez que le débogage USB est activé (voir « Aide »).";
         if (m.contains("Accès USB")) return "Accès USB non accordé. Rebranchez le câble et acceptez la demande du téléphone.";
         if (m.contains("occupé")) return "Le port USB est utilisé par une autre appli. Fermez-la puis rebranchez.";

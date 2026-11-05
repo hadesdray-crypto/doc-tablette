@@ -84,7 +84,10 @@ public final class AdbConnection {
         int off = 0;
         while (off < len) {
             long left = deadline - System.currentTimeMillis();
-            if (left <= 0) return false;
+            if (left <= 0) {
+                if (off > 0) throw new IOException("Message ADB tronqué");
+                return false;
+            }
             int r = ch.read(b, off, len - off, (int) Math.min(left, 1000));
             if (r < 0) {
                 closed = true;
@@ -174,7 +177,7 @@ public final class AdbConnection {
     }
 
     private static String text(byte[] b) {
-        return new String(b, StandardCharsets.UTF_8);
+        return new String(b, StandardCharsets.UTF_8).replace("\r\n", "\n");
     }
 
     /** Interface pour suivre l'envoi d'un gros fichier. */

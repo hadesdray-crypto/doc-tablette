@@ -82,6 +82,10 @@ final class Updater {
                 long have = part.exists() ? part.length() : 0;
                 HttpURLConnection c = open(info.url, have);
                 int code = c.getResponseCode();
+                if (code == 416) {
+                    part.delete();
+                    throw new IOException("Reprise impossible, nouveau téléchargement");
+                }
                 if (code == 200) have = 0; // le serveur ne reprend pas : on repart de zéro
                 else if (code != 206) throw new IOException("Réponse " + code);
                 long total = have + c.getContentLengthLong();

@@ -146,7 +146,7 @@ public class MainActivity extends Activity {
         if (pendingApk != null && canInstall()) {
             File f = pendingApk;
             pendingApk = null;
-            doInstall(f);
+            net.execute(() -> doInstall(f));
         }
     }
 
@@ -722,7 +722,7 @@ public class MainActivity extends Activity {
         String k = "anim_" + link.key;
         if (prefs.contains(k)) return;
         String o = link.sh("settings get global window_animation_scale; settings get global transition_animation_scale; settings get global animator_duration_scale", 10000)
-                .trim().replace("\n", "|");
+                .trim().replace("\r", "").replace("\n", "|");
         prefs.edit().putString(k, o).apply();
     }
 
@@ -1009,15 +1009,17 @@ public class MainActivity extends Activity {
                     }
                 }
                 final long fsize = size;
-                link.cx.setProgress(sent -> setUpd("Envoi vers la tablette… " + (100 * sent / fsize) + " %", (int) (100 * sent / fsize)));
+                final fr.doctablette.adb.AdbConnection cx = link.cx;
+                if (cx == null) throw new IOException("Pas de connexion");
+                cx.setProgress(sent -> setUpd("Envoi vers la tablette… " + (100 * sent / fsize) + " %", (int) (100 * sent / fsize)));
                 String out;
                 try (InputStream in = getContentResolver().openInputStream(uri)) {
-                    out = link.cx.execWithInput("cmd package install -r -S " + size, in, 900000);
+                    out = cx.execWithInput("cmd package install -r -S " + size, in, 900000);
                 }
                 if (!out.contains("Success") && !out.contains("Failure")) {
                     setUpd("Nouvel essai (méthode 2)…", 0);
                     try (InputStream in = getContentResolver().openInputStream(uri)) {
-                        link.cx.execWithInput("head -c " + size + " > /data/local/tmp/dt-install.apk", in, 900000);
+                        cx.execWithInput("head -c " + size + " > /data/local/tmp/dt-install.apk", in, 900000);
                     }
                     setUpd("Installation sur la tablette…", -1);
                     out = link.sh("pm install -r /data/local/tmp/dt-install.apk; rm -f /data/local/tmp/dt-install.apk", 300000);
@@ -1028,7 +1030,8 @@ public class MainActivity extends Activity {
                     if (res.contains("Success")) info("Installé", "L'appli a été installée sur la tablette.");
                     else info("Installation impossible", installError(res));
                 });
-            } catch (IOException e) {
+            } catch (Exception ex) {
+                final IOException e = ex instanceof IOException ? (IOException) ex : new IOException(String.valueOf(ex.getMessage()));
                 setUpd("", -1);
                 ui.post(() -> {
                     lost(e);
@@ -1065,7 +1068,7 @@ public class MainActivity extends Activity {
                     done = "ok";
                 } else {
                     byte[] page = TestPage.HTML.getBytes(StandardCharsets.UTF_8);
-                    link.cx.execWithInput("head -c " + page.length + " > /sdcard/Download/doc-tablette-test.html",
+                    link.execIn("head -c " + page.length + " > /sdcard/Download/doc-tablette-test.html",
                             new java.io.ByteArrayInputStream(page), 30000);
                     out = link.sh("am start -a android.intent.action.VIEW -d file:///sdcard/Download/doc-tablette-test.html -t text/html", 20000);
                     if (!Repairs.failed(out) && !out.contains("Error")) done = "ok";
@@ -1200,7 +1203,7 @@ public class MainActivity extends Activity {
                         Intent s = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
                         startActivity(s);
                     } else {
-                        doInstall(apk);
+                        net.execute(() -> doInstall(apk));
                     }
                 });
             } catch (Exception e) {
@@ -1214,7 +1217,7 @@ public class MainActivity extends Activity {
             Updater.backupCurrent(this);
             setUpd("Installation en cours… Confirmez si Android le demande.", -1);
             Updater.install(this, apk, ACTION_INSTALL);
-        } catch (IOException e) {
+        } catch (Exception e) {
             setUpd("Installation impossible : " + e.getMessage(), -1);
         }
     }
