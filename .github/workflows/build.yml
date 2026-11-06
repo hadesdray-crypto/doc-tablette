@@ -22,10 +22,11 @@ jobs:
       - name: Tests du protocole ADB et de la logique
         run: |
           mkdir -p out
-          javac -encoding UTF-8 -d out app/src/main/java/fr/doctablette/adb/Adb{Channel,Crypto,Connection}.java app/src/main/java/fr/doctablette/adb/Fastboot.java app/src/main/java/fr/doctablette/logic/*.java protocol-test/*.java
+          javac -encoding UTF-8 -d out app/src/main/java/fr/doctablette/adb/Adb{Channel,Crypto,Connection}.java app/src/main/java/fr/doctablette/adb/Fastboot.java app/src/main/java/fr/doctablette/adb/OdinDownload.java app/src/main/java/fr/doctablette/logic/*.java protocol-test/*.java
           java -Dfile.encoding=UTF-8 -cp out FakeAdbTest
           java -Dfile.encoding=UTF-8 -cp out LogicTest
           java -Dfile.encoding=UTF-8 -cp out FakeFastbootTest
+          java -Dfile.encoding=UTF-8 -cp out FakeOdinTest
 
       - name: Android SDK (déjà présent sur la machine)
         run: |

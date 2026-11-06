@@ -15,4 +15,8 @@ public interface AdbChannel extends Closeable {
 
     /** Plus grosse taille acceptée par un seul write (USB : 16384). */
     int maxChunk();
+
+    /** Envoie un paquet vide (certains protocoles USB, comme Samsung Odin, en ont besoin). */
+    default void writeEmpty() throws IOException {
+    }
 }

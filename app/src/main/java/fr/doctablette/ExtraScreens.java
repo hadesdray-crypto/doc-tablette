@@ -86,6 +86,7 @@ final class ExtraScreens {
                 c.addView(a.btn("Se connecter à la tablette", true, v -> a.go("CONNECT")));
             }
         }
+        if (s.kind == Situation.ODIN) c.addView(a.btn("Ouvrir le mode Téléchargement Samsung", true, v -> a.go("ODIN")));
         if (s.kind == Situation.FASTBOOT) c.addView(a.btn("Ouvrir les outils fastboot", true, v -> a.go("FASTBOOT")));
         if (s.kind == Situation.UNAUTHORIZED) c.addView(a.btn("Réessayer la connexion", true, v -> a.go("CONNECT")));
         c.addView(a.btn("Voir le guide pour ce cas", false, v -> openGuide(s.query)));
@@ -530,6 +531,89 @@ final class ExtraScreens {
             try (java.io.InputStream in = a.getContentResolver().openInputStream(u)) {
                 fr.doctablette.adb.Fastboot.Reply r = fb.flash(part, in, len, (s, t) -> fbSay("Envoi " + (100 * s / t) + " %"));
                 fbSay(r.ok ? "Image installée dans « " + part + " ». Redémarrez la tablette." : "Refusé par la tablette : " + r.text);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Mode Téléchargement Samsung (Odin) : lecture et sortie
+    // ------------------------------------------------------------------
+    String odinInfo = "";
+    boolean odinBusy;
+    TextView odinLine;
+
+    android.hardware.usb.UsbDevice odinDevice() {
+        for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
+            if (d.getVendorId() == 0x04e8 && fr.doctablette.adb.UsbAdbChannel.hasCdcDataInterface(d)) return d;
+        return null;
+    }
+
+    void odinSay(String m) {
+        odinInfo = m;
+        a.ui.post(() -> {
+            if (odinLine != null) odinLine.setText(m);
+        });
+    }
+
+    void odinScreen(LinearLayout c) {
+        android.hardware.usb.UsbDevice d = odinDevice();
+        c.addView(a.tv("La tablette Samsung est en mode Téléchargement. Ici, Doc Tablette peut lire la liste des partitions et faire quitter ce mode. Aucune de ces deux actions n'écrit ni n'efface quoi que ce soit.", 15, MainActivity.TEXT, false));
+        if (d == null) {
+            c.addView(a.tv("Aucune tablette Samsung en mode Téléchargement n'est branchée.", 16, MainActivity.C_WARN, true));
+            return;
+        }
+        LinearLayout k = a.card(0);
+        odinLine = a.tv(odinInfo.isEmpty() ? "Choisissez une action." : odinInfo, 14, MainActivity.MUTED, false);
+        k.addView(odinLine);
+        c.addView(k);
+        if (odinBusy) return;
+        if (!a.usb.hasPermission(d)) {
+            final android.hardware.usb.UsbDevice dd = d;
+            c.addView(a.btn("Autoriser l'accès USB à la tablette", true, v -> {
+                android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(a, 0,
+                        new Intent(MainActivity.ACTION_USB_PERM).setPackage(a.getPackageName()),
+                        android.app.PendingIntent.FLAG_MUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+                a.usb.requestPermission(dd, pi);
+            }));
+            return;
+        }
+        c.addView(a.btn("Lire la liste des partitions", true, v -> odinRun(false)));
+        c.addView(a.btn("Quitter le mode Téléchargement (redémarrer)", false, v -> a.ask("Quitter ?", "La tablette quitte le mode Téléchargement et redémarre. Rien n'est effacé.", "Quitter", () -> odinRun(true))));
+        c.addView(a.tv("L'installation d'un système Samsung (fichiers .tar.md5) n'est pas encore disponible dans cette version.", 13, MainActivity.MUTED, false));
+    }
+
+    void odinRun(final boolean exit) {
+        odinBusy = true;
+        odinSay("Connexion à la tablette…");
+        a.render();
+        a.io.execute(() -> {
+            fr.doctablette.adb.UsbAdbChannel ch = null;
+            try {
+                android.hardware.usb.UsbDevice d = odinDevice();
+                if (d == null) throw new java.io.IOException("Tablette débranchée");
+                ch = fr.doctablette.adb.UsbAdbChannel.openCdc(a.usb, d);
+                fr.doctablette.adb.OdinDownload o = new fr.doctablette.adb.OdinDownload(ch);
+                o.handshake();
+                o.beginSession();
+                StringBuilder sb = new StringBuilder();
+                if (!exit) {
+                    List<fr.doctablette.adb.OdinDownload.Partition> ps = fr.doctablette.adb.OdinDownload.parsePit(o.readPit());
+                    sb.append(ps.size()).append(" partitions :\n");
+                    for (fr.doctablette.adb.OdinDownload.Partition p : ps) sb.append("- ").append(p.name).append(" (").append(p.flashFile).append(")\n");
+                }
+                o.end(exit);
+                odinSay(exit ? "La tablette redémarre." : sb.toString());
+            } catch (Exception ex) {
+                odinSay("Échec : " + ex.getMessage());
+            } finally {
+                if (ch != null) try {
+                    ch.close();
+                } catch (Exception ignored) {
+                }
+                a.ui.post(() -> {
+                    odinBusy = false;
+                    a.render();
+                });
             }
         });
     }

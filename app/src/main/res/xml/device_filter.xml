@@ -6,4 +6,6 @@
     <usb-device class="255" subclass="66" protocol="3" />
     <!-- Tablette branchée comme appareil photo / transfert de fichiers (PTP, MTP) -->
     <usb-device class="6" subclass="1" />
+    <!-- Mode Téléchargement Samsung (Odin) -->
+    <usb-device vendor-id="1256" />
 </resources>

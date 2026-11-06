@@ -40,9 +40,34 @@ public final class UsbAdbChannel implements AdbChannel {
         this(mgr, dev, 1);
     }
 
+    /** Mode Téléchargement Samsung : interface « données CDC » (classe 10) avec deux points d'échange. */
+    public static boolean hasCdcDataInterface(UsbDevice d) {
+        return findCdc(d) != null;
+    }
+
+    static UsbInterface findCdc(UsbDevice d) {
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface f = d.getInterface(i);
+            if (f.getInterfaceClass() == 10 && f.getEndpointCount() >= 2) return f;
+        }
+        return null;
+    }
+
+    public static UsbAdbChannel openCdc(UsbManager mgr, UsbDevice dev) throws IOException {
+        return new UsbAdbChannel(mgr, dev, -1);
+    }
+
+    @Override
+    public void writeEmpty() {
+        try {
+            conn.bulkTransfer(out, new byte[0], 0, 100);
+        } catch (Exception ignored) {
+        }
+    }
+
     public UsbAdbChannel(UsbManager mgr, UsbDevice dev, int protocol) throws IOException {
-        intf = findInterface(dev, protocol);
-        if (intf == null) throw new IOException("Cette connexion USB n'est pas en mode débogage");
+        intf = protocol < 0 ? findCdc(dev) : findInterface(dev, protocol);
+        if (intf == null) throw new IOException(protocol < 0 ? "Ce n'est pas un mode Téléchargement" : "Cette connexion USB n'est pas en mode débogage");
         UsbEndpoint ei = null, eo = null;
         for (int i = 0; i < intf.getEndpointCount(); i++) {
             UsbEndpoint e = intf.getEndpoint(i);

@@ -7,7 +7,7 @@ import java.util.Map;
 
 /** Reconnaît ce qui est branché au câble et dit quoi faire, en français simple. */
 final class Situation {
-    static final int NONE = 0, ADB = 1, FASTBOOT = 2, MTP = 3, DOWNLOAD = 4, STORAGE = 5, UNKNOWN = 6, RECOVERY = 7, SIDELOAD = 8, UNAUTHORIZED = 9;
+    static final int NONE = 0, ADB = 1, FASTBOOT = 2, MTP = 3, DOWNLOAD = 4, STORAGE = 5, UNKNOWN = 6, RECOVERY = 7, SIDELOAD = 8, UNAUTHORIZED = 9, ODIN = 10;
 
     final int kind;
     final String title;      // phrase courte : ce que le téléphone voit
@@ -40,7 +40,7 @@ final class Situation {
     }
 
     static Situation of(UsbDevice d, String adbBanner, boolean connectedOk, boolean authRefused) {
-        boolean adb = false, fastboot = false, mtp = false, storage = false;
+        boolean adb = false, fastboot = false, mtp = false, storage = false, cdc = false;
         for (int i = 0; i < d.getInterfaceCount(); i++) {
             UsbInterface f = d.getInterface(i);
             int c = f.getInterfaceClass(), s = f.getInterfaceSubclass(), p = f.getInterfaceProtocol();
@@ -49,6 +49,7 @@ final class Situation {
             else if (c == 6 && s == 1) mtp = true;
             else if (c == 255 && s == 255) mtp = mtp || (f.getName() != null && f.getName().contains("MTP"));
             else if (c == 8) storage = true;
+            else if (c == 10 && f.getEndpointCount() >= 2) cdc = true;
         }
         String b = adbBanner == null ? "" : adbBanner;
         if (adb && b.startsWith("sideload")) return new Situation(SIDELOAD, "La tablette est en mode « sideload »",
@@ -74,6 +75,10 @@ final class Situation {
                 "C'est un mode pour installer un système. Il ne montre pas les photos. Ce n'est pas un mode de réparation simple.",
                 new String[]{"Pour en sortir : maintenez la touche marche jusqu'au redémarrage (10 à 20 secondes).", "Si elle revient toujours ici, cherchez le modèle dans le guide."},
                 "Rien tant que vous n'installez rien.", "bootloader fastboot", false);
+        if (cdc && d.getVendorId() == 0x04e8 && !mtp) return new Situation(ODIN, "La tablette Samsung est en mode Téléchargement",
+                "C'est l'écran bleu « Downloading… » ou d'avertissement. Il sert à réinstaller le système Samsung. Si ce n'était pas voulu, on peut simplement en sortir.",
+                new String[]{"Pour en sortir : touchez « Quitter le mode Téléchargement » (rien n'est effacé).", "Sinon : maintenez Volume bas + Marche pendant 10 secondes.", "Si la tablette revient toujours ici, ouvrez le guide : boucle de démarrage."},
+                "Quitter ce mode n'efface rien. Réinstaller le système, lui, efface tout.", "mode téléchargement", false);
         String low = lowLevel(d);
         if (low != null) return new Situation(DOWNLOAD, "Mode bas niveau détecté : " + low,
                 "La tablette est dans un mode de réinstallation du système. Un téléphone seul ne peut pas la réparer ici : il faut un ordinateur et le bon logiciel du fabricant.",
