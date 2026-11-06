@@ -53,7 +53,7 @@ android {
 }
 
 dependencies {
-    // Lecture de l'étiquette (texte) et des codes-barres, modèles inclus : fonctionne hors connexion
-    implementation 'com.google.mlkit:text-recognition:16.0.1'
-    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
+    // Lecture de l'étiquette (texte) et des codes-barres : modèles chargés par Google Play services (APK léger)
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1'
+    implementation 'com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.0'
 }

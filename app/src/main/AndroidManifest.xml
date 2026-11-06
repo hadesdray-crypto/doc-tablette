@@ -11,6 +11,8 @@
         android:label="@string/app_name"
         android:theme="@style/AppTheme">
 
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="ocr,barcode" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|fontScale|density"
