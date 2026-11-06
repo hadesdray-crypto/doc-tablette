@@ -8,4 +8,10 @@
     <usb-device class="6" subclass="1" />
     <!-- Mode Téléchargement Samsung (Odin) -->
     <usb-device vendor-id="1256" />
+    <!-- Modes de chargement de puces : MediaTek, Rockchip, Allwinner, Unisoc, Qualcomm -->
+    <usb-device vendor-id="3725" />
+    <usb-device vendor-id="8711" />
+    <usb-device vendor-id="7994" />
+    <usb-device vendor-id="6018" />
+    <usb-device vendor-id="1478" />
 </resources>

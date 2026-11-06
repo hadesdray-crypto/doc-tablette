@@ -53,6 +53,31 @@ public final class UsbAdbChannel implements AdbChannel {
         return null;
     }
 
+    /** Modes de chargement des puces (MediaTek, Rockchip…) : première interface avec une entrée et une sortie en vrac. */
+    static UsbInterface findBulk(UsbDevice d) {
+        UsbInterface best = null;
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface f = d.getInterface(i);
+            boolean in = false, out = false;
+            for (int j = 0; j < f.getEndpointCount(); j++) {
+                UsbEndpoint e = f.getEndpoint(j);
+                if (e.getType() != UsbConstants.USB_ENDPOINT_XFER_BULK) continue;
+                if (e.getDirection() == UsbConstants.USB_DIR_IN) in = true;
+                else out = true;
+            }
+            if (in && out && (best == null || f.getInterfaceClass() == 10)) best = f;
+        }
+        return best;
+    }
+
+    public static boolean hasBulkInterface(UsbDevice d) {
+        return findBulk(d) != null;
+    }
+
+    public static UsbAdbChannel openBulk(UsbManager mgr, UsbDevice dev) throws IOException {
+        return new UsbAdbChannel(mgr, dev, -2);
+    }
+
     public static UsbAdbChannel openCdc(UsbManager mgr, UsbDevice dev) throws IOException {
         return new UsbAdbChannel(mgr, dev, -1);
     }
@@ -66,7 +91,7 @@ public final class UsbAdbChannel implements AdbChannel {
     }
 
     public UsbAdbChannel(UsbManager mgr, UsbDevice dev, int protocol) throws IOException {
-        intf = protocol < 0 ? findCdc(dev) : findInterface(dev, protocol);
+        intf = protocol == -2 ? findBulk(dev) : protocol < 0 ? findCdc(dev) : findInterface(dev, protocol);
         if (intf == null) throw new IOException(protocol < 0 ? "Ce n'est pas un mode Téléchargement" : "Cette connexion USB n'est pas en mode débogage");
         UsbEndpoint ei = null, eo = null;
         for (int i = 0; i < intf.getEndpointCount(); i++) {

@@ -87,6 +87,7 @@ final class ExtraScreens {
             }
         }
         if (s.kind == Situation.ODIN) c.addView(a.btn("Ouvrir le mode Téléchargement Samsung", true, v -> a.go("ODIN")));
+        if (chipDevice() != null) c.addView(a.btn("Ouvrir l'écran des puces (Archos, tablettes chinoises)", true, v -> a.go("CHIP")));
         if (s.kind == Situation.FASTBOOT) c.addView(a.btn("Ouvrir les outils fastboot", true, v -> a.go("FASTBOOT")));
         if (s.kind == Situation.UNAUTHORIZED) c.addView(a.btn("Réessayer la connexion", true, v -> a.go("CONNECT")));
         c.addView(a.btn("Voir le guide pour ce cas", false, v -> openGuide(s.query)));
@@ -832,5 +833,101 @@ final class ExtraScreens {
             a.prefs.edit().putBoolean("simple", false).apply();
             a.render();
         }));
+    }
+
+    // ------------------------------------------------------------------
+    // Puces (MediaTek, Rockchip, Allwinner, Unisoc…) : reconnaissance et tests en lecture seule
+    // ------------------------------------------------------------------
+    String chipInfo = "";
+    boolean chipBusy;
+    TextView chipLine;
+
+    android.hardware.usb.UsbDevice chipDevice() {
+        for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
+            if (ChipDb.of(d.getVendorId(), d.getProductId()) != null) return d;
+        return null;
+    }
+
+    void chipSay(String m) {
+        chipInfo = m;
+        a.ui.post(() -> {
+            if (chipLine != null) chipLine.setText(m);
+        });
+    }
+
+    void chipScreen(LinearLayout c) {
+        android.hardware.usb.UsbDevice d = chipDevice();
+        if (d == null) {
+            c.addView(a.tv("Aucune tablette en mode de chargement de puce n'est branchée.", 16, MainActivity.C_WARN, true));
+            c.addView(a.tv("Cet écran sert aux tablettes Archos, aux tablettes chinoises et aux téléphones à puce MediaTek, Rockchip, Allwinner ou Unisoc qui ne démarrent plus.", 15, MainActivity.TEXT, false));
+            return;
+        }
+        final ChipDb.Chip ch = ChipDb.of(d.getVendorId(), d.getProductId());
+        LinearLayout k = a.card(MainActivity.C_WARN);
+        k.addView(a.tv(ch.family + " : " + ch.mode, 19, MainActivity.TEXT, true));
+        k.addView(a.tv(ch.explain, 15, MainActivity.TEXT, false));
+        k.addView(a.tv("Identifiant USB : " + String.format("%04x:%04x", d.getVendorId(), d.getProductId()), 13, MainActivity.MUTED, false));
+        c.addView(k);
+        int n = 1;
+        for (String st : ch.steps) c.addView(a.tv(n++ + ". " + st, 15, MainActivity.TEXT, false));
+        LinearLayout r = a.card(0);
+        chipLine = a.tv(chipInfo.isEmpty() ? "Les tests ci-dessous n'écrivent rien dans la tablette." : chipInfo, 14, MainActivity.MUTED, false);
+        r.addView(chipLine);
+        c.addView(r);
+        if (chipBusy) return;
+        if (!ch.probe) {
+            c.addView(a.tv("Pas de test de lecture pour cette puce dans cette version. Voir le guide pour ce cas.", 14, MainActivity.MUTED, false));
+            return;
+        }
+        if (!a.usb.hasPermission(d)) {
+            final android.hardware.usb.UsbDevice dd = d;
+            c.addView(a.btn("Autoriser l'accès USB à la tablette", true, v -> {
+                android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(a, 0,
+                        new Intent(MainActivity.ACTION_USB_PERM).setPackage(a.getPackageName()),
+                        android.app.PendingIntent.FLAG_MUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+                a.usb.requestPermission(dd, pi);
+            }));
+            return;
+        }
+        final boolean mtk = d.getVendorId() == 0x0e8d;
+        c.addView(a.btn(mtk ? "Identifier la puce (lecture seule)" : "Tester la réponse de la puce (lecture seule)", true, v -> chipRun(mtk, false)));
+        if (!mtk)
+            c.addView(a.btn("Redémarrer la tablette", false, v -> a.ask("Redémarrer ?", "La tablette redémarre. Rien n'est effacé.", "Redémarrer", () -> chipRun(false, true))));
+    }
+
+    void chipRun(final boolean mtk, final boolean reboot) {
+        chipBusy = true;
+        chipSay("Connexion à la tablette…");
+        a.render();
+        a.io.execute(() -> {
+            fr.doctablette.adb.UsbAdbChannel ch = null;
+            try {
+                android.hardware.usb.UsbDevice d = chipDevice();
+                if (d == null) throw new java.io.IOException("Tablette débranchée");
+                ch = fr.doctablette.adb.UsbAdbChannel.openBulk(a.usb, d);
+                fr.doctablette.adb.ChipProbe p = new fr.doctablette.adb.ChipProbe(ch);
+                if (mtk) {
+                    int hw = p.mediatekHwCode();
+                    String nm = ChipDb.mtkName(hw);
+                    chipSay("Code matériel MediaTek : 0x" + Integer.toHexString(hw) + (nm != null ? "\nPuce probable : " + nm + " (à vérifier)" : "\nPuce non listée : notez ce code pour la recherche du firmware."));
+                } else if (reboot) {
+                    p.rockchipReboot();
+                    chipSay("Redémarrage demandé.");
+                } else {
+                    chipSay(p.rockchipReady() ? "La puce Rockchip répond correctement." : "La puce répond, mais signale qu'elle n'est pas prête.");
+                }
+            } catch (Exception ex) {
+                chipSay("Échec : " + ex.getMessage() + "\nRien n'a été modifié. Débranchez, rebranchez, et réessayez.");
+            } finally {
+                if (ch != null) try {
+                    ch.close();
+                } catch (Exception ignored) {
+                }
+                a.ui.post(() -> {
+                    chipBusy = false;
+                    a.render();
+                });
+            }
+        });
     }
 }

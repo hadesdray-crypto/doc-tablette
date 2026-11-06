@@ -256,6 +256,7 @@ public class MainActivity extends Activity {
             case "FASTBOOT": return "Mode bootloader (fastboot)";
             case "PHOTO": return "Trouver le modèle par photo";
             case "ODIN": return "Mode Téléchargement Samsung";
+            case "CHIP": return "Puces : Archos et tablettes chinoises";
             default: return "Doc Tablette";
         }
     }
@@ -444,6 +445,7 @@ public class MainActivity extends Activity {
             case "FASTBOOT": extra.fastbootScreen(c); break;
             case "PHOTO": extra.photoScreen(c); break;
             case "ODIN": extra.odinScreen(c); break;
+            case "CHIP": extra.chipScreen(c); break;
             default: homeScreen(c);
         }
         setContentView(root);
@@ -1369,7 +1371,7 @@ public class MainActivity extends Activity {
                 } else {
                     connectMsg = "Accès USB refusé. Rebranchez le câble et touchez « OK » à la demande.";
                 }
-                if (top().equals("CONNECT") || top().equals("FASTBOOT") || top().equals("ODIN")) render();
+                if (top().equals("CONNECT") || top().equals("FASTBOOT") || top().equals("ODIN") || top().equals("CHIP")) render();
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(a)) {
                 UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if (link.usbDevice != null && d != null && link.usbDevice.getDeviceName().equals(d.getDeviceName())) {
