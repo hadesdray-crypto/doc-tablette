@@ -86,6 +86,7 @@ final class ExtraScreens {
                 c.addView(a.btn("Se connecter à la tablette", true, v -> a.go("CONNECT")));
             }
         }
+        if (s.kind == Situation.FASTBOOT) c.addView(a.btn("Ouvrir les outils fastboot", true, v -> a.go("FASTBOOT")));
         if (s.kind == Situation.UNAUTHORIZED) c.addView(a.btn("Réessayer la connexion", true, v -> a.go("CONNECT")));
         c.addView(a.btn("Voir le guide pour ce cas", false, v -> openGuide(s.query)));
         c.addView(a.btn("Chercher à nouveau", false, v -> {
@@ -229,6 +230,153 @@ final class ExtraScreens {
                 backupMsg = msg;
                 a.render();
             });
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Fastboot (tablette en mode bootloader)
+    // ------------------------------------------------------------------
+    fr.doctablette.adb.Fastboot fb;
+    String fbInfo = "";
+    boolean fbBusy;
+    TextView fbLine;
+    String fbPartition = "boot";
+    Uri fbImage;
+
+    android.hardware.usb.UsbDevice fastbootDevice() {
+        for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
+            if (fr.doctablette.adb.UsbAdbChannel.hasFastbootInterface(d)) return d;
+        return null;
+    }
+
+    void fbSay(String m) {
+        fbInfo = m;
+        a.ui.post(() -> {
+            if (fbLine != null) fbLine.setText(m);
+        });
+    }
+
+    void fastbootScreen(LinearLayout c) {
+        android.hardware.usb.UsbDevice d = fastbootDevice();
+        c.addView(a.tv("La tablette est en mode bootloader (fastboot). Ce mode sert à réinstaller des parties du système. Une mauvaise image peut rendre la tablette inutilisable : n'installez que l'image officielle exacte de CE modèle.", 15, MainActivity.TEXT, false));
+        if (d == null) {
+            fb = null;
+            c.addView(a.tv("Aucune tablette en mode fastboot n'est branchée.", 16, MainActivity.C_WARN, true));
+            return;
+        }
+        fbLine = a.tv(fbInfo.isEmpty() ? "Touchez « Lire les informations »." : fbInfo, 14, MainActivity.MUTED, false);
+        LinearLayout k = a.card(0);
+        k.addView(fbLine);
+        c.addView(k);
+        if (fbBusy) return;
+        if (!a.usb.hasPermission(d)) {
+            final android.hardware.usb.UsbDevice dd = d;
+            c.addView(a.btn("Autoriser l'accès USB à la tablette", true, v -> {
+                android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(a, 0,
+                        new Intent(MainActivity.ACTION_USB_PERM).setPackage(a.getPackageName()),
+                        android.app.PendingIntent.FLAG_MUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+                a.usb.requestPermission(dd, pi);
+            }));
+            return;
+        }
+        c.addView(a.btn("Lire les informations de la tablette", true, v -> fbRun(() -> {
+            StringBuilder sb = new StringBuilder();
+            for (String n : new String[]{"product", "variant", "serialno", "secure", "unlocked", "current-slot", "max-download-size", "version-bootloader"}) {
+                String val = fb.getvar(n);
+                if (!val.isEmpty()) sb.append(n).append(" : ").append(val).append("\n");
+            }
+            fbSay(sb.length() == 0 ? "L'appareil n'a rien répondu." : sb.toString());
+        })));
+        c.addView(a.btn("Redémarrer normalement", false, v -> a.ask("Redémarrer ?", "La tablette redémarre sur son système.", "Redémarrer", () -> fbRun(() -> {
+            fb.command("reboot", 8000);
+            fbSay("Redémarrage demandé.");
+        }))));
+        c.addView(a.btn("Redémarrer en mode récupération", false, v -> a.ask("Redémarrer en récupération ?", "La tablette redémarre dans son menu de secours. Rien n'est effacé par ce redémarrage.", "Redémarrer", () -> fbRun(() -> {
+            fr.doctablette.adb.Fastboot.Reply r = fb.command("reboot-recovery", 8000);
+            fbSay(r.ok ? "Demande envoyée." : "Non pris en charge par cet appareil : " + r.text);
+        }))));
+        c.addView(a.btn("Vider le cache (sans toucher aux photos)", false, v -> a.ask("Vider le cache ?", "Efface seulement la partition de cache. Vos photos, vidéos et applis ne sont pas touchées.", "Vider", () -> fbRun(() -> {
+            fr.doctablette.adb.Fastboot.Reply r = fb.command("erase:cache", 60000);
+            fbSay(r.ok ? "Cache vidé." : "Refusé : " + r.text + " (appareil verrouillé ?)");
+        }))));
+        c.addView(a.tv("Installer une image (avancé)", 17, MainActivity.ACCENT, true));
+        final EditText e = new EditText(a);
+        e.setText(fbPartition);
+        e.setHint("Partition : boot, recovery…");
+        e.setHintTextColor(MainActivity.MUTED);
+        e.setTextColor(MainActivity.TEXT);
+        e.setSingleLine(true);
+        c.addView(e, new LinearLayout.LayoutParams(MainActivity.MATCH, MainActivity.WRAP));
+        c.addView(a.btn(fbImage == null ? "Choisir le fichier image (.img)" : "Fichier choisi : changer", false, v -> {
+            fbPartition = e.getText().toString().trim();
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            try {
+                a.startActivityForResult(i, REQ_IMG);
+            } catch (Exception ex) {
+                a.toast("Aucun sélecteur de fichiers");
+            }
+        }));
+        if (fbImage != null) c.addView(a.btn("Installer cette image maintenant", false, v -> {
+            fbPartition = e.getText().toString().trim();
+            a.ask("ATTENTION", "Vous allez écrire l'image dans la partition « " + fbPartition + " ».\n\nUne image qui ne correspond pas EXACTEMENT à ce modèle peut empêcher la tablette de démarrer. Les données peuvent être perdues (surtout avec « system » ou « userdata »).\n\nSauvegardez d'abord les photos si la tablette démarre encore.", "Installer", this::fbFlash);
+        }));
+    }
+
+    static final int REQ_IMG = 13;
+
+    void onImage(Uri u) {
+        fbImage = u;
+        a.render();
+    }
+
+    void fbRun(final FbTask t) {
+        fbBusy = true;
+        fbSay("En cours…");
+        a.render();
+        a.io.execute(() -> {
+            fr.doctablette.adb.UsbAdbChannel ch = null;
+            try {
+                android.hardware.usb.UsbDevice d = fastbootDevice();
+                if (d == null) throw new java.io.IOException("Tablette débranchée");
+                if (!a.usb.hasPermission(d)) throw new java.io.IOException("Accès USB non accordé : rebranchez et acceptez la demande");
+                ch = new fr.doctablette.adb.UsbAdbChannel(a.usb, d, 3);
+                fb = new fr.doctablette.adb.Fastboot(ch);
+                t.run();
+            } catch (Exception ex) {
+                fbSay("Échec : " + ex.getMessage());
+            } finally {
+                if (ch != null) try {
+                    ch.close();
+                } catch (Exception ignored) {
+                }
+                fb = null;
+                a.ui.post(() -> {
+                    fbBusy = false;
+                    a.render();
+                });
+            }
+        });
+    }
+
+    interface FbTask {
+        void run() throws Exception;
+    }
+
+    void fbFlash() {
+        final Uri u = fbImage;
+        final String part = fbPartition;
+        fbRun(() -> {
+            long len;
+            try (android.content.res.AssetFileDescriptor afd = a.getContentResolver().openAssetFileDescriptor(u, "r")) {
+                len = afd == null ? -1 : afd.getLength();
+            }
+            if (len <= 0) throw new java.io.IOException("Taille du fichier inconnue");
+            try (java.io.InputStream in = a.getContentResolver().openInputStream(u)) {
+                fr.doctablette.adb.Fastboot.Reply r = fb.flash(part, in, len, (s, t) -> fbSay("Envoi " + (100 * s / t) + " %"));
+                fbSay(r.ok ? "Image installée dans « " + part + " ». Redémarrez la tablette." : "Refusé par la tablette : " + r.text);
+            }
         });
     }
 

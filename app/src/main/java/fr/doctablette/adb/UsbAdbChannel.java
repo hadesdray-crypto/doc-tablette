@@ -20,16 +20,28 @@ public final class UsbAdbChannel implements AdbChannel {
         return findInterface(d) != null;
     }
 
+    public static boolean hasFastbootInterface(UsbDevice d) {
+        return findInterface(d, 3) != null;
+    }
+
     static UsbInterface findInterface(UsbDevice d) {
+        return findInterface(d, 1);
+    }
+
+    static UsbInterface findInterface(UsbDevice d, int protocol) {
         for (int i = 0; i < d.getInterfaceCount(); i++) {
             UsbInterface f = d.getInterface(i);
-            if (f.getInterfaceClass() == 255 && f.getInterfaceSubclass() == 66 && f.getInterfaceProtocol() == 1) return f;
+            if (f.getInterfaceClass() == 255 && f.getInterfaceSubclass() == 66 && f.getInterfaceProtocol() == protocol) return f;
         }
         return null;
     }
 
     public UsbAdbChannel(UsbManager mgr, UsbDevice dev) throws IOException {
-        intf = findInterface(dev);
+        this(mgr, dev, 1);
+    }
+
+    public UsbAdbChannel(UsbManager mgr, UsbDevice dev, int protocol) throws IOException {
+        intf = findInterface(dev, protocol);
         if (intf == null) throw new IOException("Cette connexion USB n'est pas en mode débogage");
         UsbEndpoint ei = null, eo = null;
         for (int i = 0; i < intf.getEndpointCount(); i++) {

@@ -222,6 +222,7 @@ public class MainActivity extends Activity {
             case "CARD": return "Fiche";
             case "HARDWARE": return "Câbles et matériel";
             case "BRANDS": return "Marques";
+            case "FASTBOOT": return "Mode bootloader (fastboot)";
             default: return "Doc Tablette";
         }
     }
@@ -371,6 +372,7 @@ public class MainActivity extends Activity {
             case "CARD": extra.cardScreen(c); break;
             case "HARDWARE": extra.hardwareScreen(c); break;
             case "BRANDS": extra.brandsScreen(c); break;
+            case "FASTBOOT": extra.fastbootScreen(c); break;
             default: homeScreen(c);
         }
         setContentView(root);
@@ -1001,6 +1003,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == ExtraScreens.REQ_IMG && res == RESULT_OK && data != null) {
+            extra.onImage(data.getData());
+            return;
+        }
         if (req == ExtraScreens.REQ_TREE && res == RESULT_OK && data != null) {
             extra.onTree(data.getData());
             return;
@@ -1283,11 +1289,11 @@ public class MainActivity extends Activity {
             if (ACTION_USB_PERM.equals(a)) {
                 UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if (d != null && i.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                    connectUsb(d);
+                    if (UsbAdbChannel.hasAdbInterface(d)) connectUsb(d);
                 } else {
                     connectMsg = "Accès USB refusé. Rebranchez le câble et touchez « OK » à la demande.";
                 }
-                if (top().equals("CONNECT")) render();
+                if (top().equals("CONNECT") || top().equals("FASTBOOT")) render();
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(a)) {
                 UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if (link.usbDevice != null && d != null && link.usbDevice.getDeviceName().equals(d.getDeviceName())) {
