@@ -11,7 +11,16 @@ adb shell am start -n $PKG/fr.doctablette.MainActivity >/dev/null
 sleep 4
 adb shell pidof $PKG >/dev/null || fail "l'appli ne démarre pas"
 
-dump() { adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml; }
+dump() {
+  local o=""
+  for i in 1 2 3 4 5; do
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    o=$(adb shell cat /sdcard/ui.xml 2>/dev/null)
+    case "$o" in *"<hierarchy"*) break;; esac
+    sleep 2
+  done
+  printf '%s' "$o"
+}
 texts() { dump | grep -o 'text="[^"]*"' | sed 's/text="//;s/"$//' ; }
 find_xy() { # position du bouton portant ce texte exact
   dump | python3 -c "
