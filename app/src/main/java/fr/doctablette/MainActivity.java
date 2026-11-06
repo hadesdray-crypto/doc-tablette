@@ -223,6 +223,7 @@ public class MainActivity extends Activity {
             case "HARDWARE": return "Câbles et matériel";
             case "BRANDS": return "Marques";
             case "FASTBOOT": return "Mode bootloader (fastboot)";
+            case "PHOTO": return "Trouver le modèle par photo";
             default: return "Doc Tablette";
         }
     }
@@ -373,6 +374,7 @@ public class MainActivity extends Activity {
             case "HARDWARE": extra.hardwareScreen(c); break;
             case "BRANDS": extra.brandsScreen(c); break;
             case "FASTBOOT": extra.fastbootScreen(c); break;
+            case "PHOTO": extra.photoScreen(c); break;
             default: homeScreen(c);
         }
         setContentView(root);
@@ -430,6 +432,7 @@ public class MainActivity extends Activity {
         c.addView(btn("Que faire maintenant ? (détection)", false, v -> go("SITUATION")));
         c.addView(btn("Sauvegarder photos et vidéos", false, v -> go("BACKUP")));
         c.addView(btn("Guide de dépannage et recherche", false, v -> go("GUIDE")));
+        c.addView(btn("Photographier l'étiquette (trouver le modèle)", false, v -> go("PHOTO")));
         c.addView(btn("Mode simple (très facile)", false, v -> {
             prefs.edit().putBoolean("simple", true).apply();
             render();
@@ -1003,6 +1006,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == ExtraScreens.REQ_PHOTO || req == ExtraScreens.REQ_PICK) {
+            extra.onPhoto(req, res == RESULT_OK, data);
+            return;
+        }
         if (req == ExtraScreens.REQ_IMG && res == RESULT_OK && data != null) {
             extra.onImage(data.getData());
             return;

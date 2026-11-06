@@ -234,6 +234,160 @@ final class ExtraScreens {
     }
 
     // ------------------------------------------------------------------
+    // Photo de l'étiquette ou du code-barres
+    // ------------------------------------------------------------------
+    static final int REQ_PHOTO = 14, REQ_PICK = 15;
+    Uri photoUri;
+    String scanMsg = "";
+    boolean scanBusy;
+    final List<String> scanModels = new ArrayList<>(), scanBarcodes = new ArrayList<>();
+    String scanBrand = "", scanText = "";
+
+    // Début de référence -> marque et famille (seulement des préfixes sûrs)
+    static final String[][] PREFIX = {
+            {"SM-T", "Samsung Galaxy Tab"}, {"SM-P", "Samsung Galaxy Tab (S Pen)"}, {"SM-X", "Samsung Galaxy Tab"},
+            {"SM-A", "Samsung Galaxy A"}, {"SM-S", "Samsung Galaxy S"}, {"SM-G", "Samsung Galaxy"}, {"SM-F", "Samsung Galaxy Z"},
+            {"SM-N", "Samsung Galaxy Note"}, {"SM-M", "Samsung Galaxy M"}, {"GT-", "Samsung (ancien modèle)"},
+            {"TB-", "Lenovo Tab"}, {"YT-", "Lenovo Yoga Tab"}, {"KF", "Amazon Fire"},
+            {"AC", "Archos (probable)"}, {"A101", "Archos"}, {"A70", "Archos"}, {"A80", "Archos"}
+    };
+
+    void photoScreen(LinearLayout c) {
+        c.addView(a.tv("Photographiez l'étiquette au dos de la tablette ou du téléphone (ou sa boîte). L'appli lit le texte et le code-barres, reconnaît la marque et le modèle, puis ouvre les fiches qui correspondent. Tout reste sur ce téléphone.", 15, MainActivity.TEXT, false));
+        c.addView(a.tv("À savoir : un code-barres contient une référence de vente ou un numéro de série, pas le modèle. Le modèle se lit surtout sur le texte de l'étiquette.", 13, MainActivity.MUTED, false));
+        if (!scanBusy) {
+            c.addView(a.btn("Photographier l'étiquette", true, v -> takePhoto()));
+            c.addView(a.btn("Choisir une photo déjà prise", false, v -> {
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                i.setType("image/*");
+                try {
+                    a.startActivityForResult(i, REQ_PICK);
+                } catch (Exception e) {
+                    a.toast("Aucune galerie");
+                }
+            }));
+        }
+        if (!scanMsg.isEmpty()) {
+            LinearLayout k = a.card(0);
+            k.addView(a.tv(scanMsg, 15, MainActivity.TEXT, false));
+            c.addView(k);
+        }
+        if (!scanBrand.isEmpty()) c.addView(a.tv("Marque / famille probable : " + scanBrand, 17, MainActivity.C_OK, true));
+        for (final String m : scanModels) {
+            c.addView(a.btn("Chercher « " + m + " » dans le guide", true, v -> openGuide(m)));
+        }
+        if (!scanBrand.isEmpty()) {
+            final String q = scanBrand.replace(" (probable)", "").replace(" (ancien modèle)", "");
+            c.addView(a.btn("Guide pour " + q, false, v -> openGuide(q)));
+        }
+        for (String b : scanBarcodes) c.addView(a.tv("Code-barres lu : " + b, 14, MainActivity.MUTED, false));
+        if (!scanText.isEmpty()) c.addView(a.tv("Texte lu :\n" + scanText, 13, MainActivity.MUTED, false));
+        c.addView(a.tv("Ou écrivez le modèle à la main", 16, MainActivity.TEXT, true));
+        final EditText e = new EditText(a);
+        e.setHint("Ex. SM-T510, TB-X606F, Archos…");
+        e.setHintTextColor(MainActivity.MUTED);
+        e.setTextColor(MainActivity.TEXT);
+        e.setSingleLine(true);
+        c.addView(e, new LinearLayout.LayoutParams(MainActivity.MATCH, MainActivity.WRAP));
+        c.addView(a.btn("Chercher", false, v -> {
+            String t = e.getText().toString().trim();
+            if (!t.isEmpty()) openGuide(t);
+        }));
+    }
+
+    void takePhoto() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                android.content.ContentValues cv = new android.content.ContentValues();
+                cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "doc-tablette-etiquette-" + System.currentTimeMillis() + ".jpg");
+                cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Doc Tablette");
+                photoUri = a.getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, photoUri);
+                a.startActivityForResult(i, REQ_PHOTO);
+            } else {
+                scanMsg = "Sur ce téléphone, prenez la photo avec l'appli Appareil photo, puis touchez « Choisir une photo déjà prise ».";
+                a.render();
+            }
+        } catch (Exception e) {
+            scanMsg = "Impossible d'ouvrir l'appareil photo. Touchez « Choisir une photo déjà prise » ou écrivez le modèle.";
+            a.render();
+        }
+    }
+
+    void onPhoto(int req, boolean ok, Intent data) {
+        Uri u = req == REQ_PHOTO ? photoUri : (data == null ? null : data.getData());
+        if (!ok || u == null) {
+            scanMsg = "Aucune photo.";
+            a.render();
+            return;
+        }
+        scanBusy = true;
+        scanMsg = "Lecture de la photo…";
+        scanModels.clear();
+        scanBarcodes.clear();
+        scanBrand = "";
+        scanText = "";
+        a.render();
+        try {
+            final com.google.mlkit.vision.common.InputImage img = com.google.mlkit.vision.common.InputImage.fromFilePath(a, u);
+            final int[] pending = {2};
+            final StringBuilder all = new StringBuilder();
+            com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
+                    .process(img)
+                    .addOnSuccessListener(t -> {
+                        all.append(t.getText());
+                        done(pending, all);
+                    })
+                    .addOnFailureListener(e -> done(pending, all));
+            com.google.mlkit.vision.barcode.BarcodeScanning.getClient().process(img)
+                    .addOnSuccessListener(list -> {
+                        for (com.google.mlkit.vision.barcode.common.Barcode b : list) {
+                            String v = b.getRawValue();
+                            if (v != null && !scanBarcodes.contains(v)) scanBarcodes.add(v);
+                        }
+                        done(pending, all);
+                    })
+                    .addOnFailureListener(e -> done(pending, all));
+        } catch (Exception e) {
+            scanBusy = false;
+            scanMsg = "Photo illisible. Réessayez avec plus de lumière, ou écrivez le modèle.";
+            a.render();
+        }
+    }
+
+    private void done(int[] pending, StringBuilder all) {
+        if (--pending[0] > 0) return;
+        scanBusy = false;
+        String txt = all.toString();
+        scanText = txt.length() > 400 ? txt.substring(0, 400) : txt;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b([A-Z]{1,4}[- ]?[A-Z0-9]{0,2}[0-9][A-Z0-9\\-]{2,10})\\b").matcher(txt.toUpperCase(java.util.Locale.ROOT));
+        while (m.find() && scanModels.size() < 5) {
+            String cand = m.group(1).replace(' ', '-');
+            if (cand.length() < 5 || scanModels.contains(cand)) continue;
+            for (String[] p : PREFIX) {
+                if (cand.startsWith(p[0])) {
+                    scanModels.add(cand);
+                    if (scanBrand.isEmpty()) scanBrand = p[1];
+                    break;
+                }
+            }
+        }
+        // marques écrites en toutes lettres
+        String low = txt.toLowerCase(java.util.Locale.ROOT);
+        if (scanBrand.isEmpty()) for (String br : new String[]{"archos", "samsung", "lenovo", "huawei", "xiaomi", "alcatel", "wiko", "asus", "acer", "amazon", "medion", "trekstor", "odys", "polaroid", "blackview", "teclast", "chuwi", "honor", "oppo", "realme", "nokia", "motorola"})
+            if (low.contains(br)) {
+                scanBrand = br.substring(0, 1).toUpperCase() + br.substring(1);
+                break;
+            }
+        if (txt.trim().isEmpty() && scanBarcodes.isEmpty()) scanMsg = "Rien de lisible sur la photo. Rapprochez-vous, avec de la lumière, sans reflet.";
+        else if (scanModels.isEmpty() && scanBrand.isEmpty()) scanMsg = "Texte lu, mais aucun modèle reconnu. Vérifiez ci-dessous ou écrivez le modèle.";
+        else scanMsg = "Lecture terminée. Vérifiez que le modèle est exact avant d'agir.";
+        a.ui.post(a::render);
+    }
+
+    // ------------------------------------------------------------------
     // Fastboot (tablette en mode bootloader)
     // ------------------------------------------------------------------
     fr.doctablette.adb.Fastboot fb;
@@ -434,6 +588,7 @@ final class ExtraScreens {
             guideCat = "";
             a.go("GUIDELIST");
         }));
+        c.addView(a.btn("Photographier l'étiquette (trouver le modèle)", false, v -> a.go("PHOTO")));
         c.addView(a.btn("Câbles et matériel à acheter", false, v -> a.go("HARDWARE")));
         c.addView(a.btn("Marques : touches et outils", false, v -> a.go("BRANDS")));
         c.addView(a.tv("Les fiches sans mention « à vérifier » ont été recoupées par 2 sources ou plus. Les autres sont rapportées par des utilisateurs : à vérifier sur votre modèle.", 13, MainActivity.MUTED, false));

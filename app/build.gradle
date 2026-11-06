@@ -51,3 +51,9 @@ android {
         abortOnError false
     }
 }
+
+dependencies {
+    // Lecture de l'étiquette (texte) et des codes-barres, modèles inclus : fonctionne hors connexion
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
+}
