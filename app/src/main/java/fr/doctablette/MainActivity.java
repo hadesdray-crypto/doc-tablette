@@ -52,7 +52,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import fr.doctablette.adb.UsbAdbChannel;
 import fr.doctablette.logic.Bilan;
@@ -75,8 +74,8 @@ public class MainActivity extends Activity {
     static final int REQ_APK = 11;
 
     final TabletLink link = new TabletLink();
-    final ExecutorService io = Executors.newSingleThreadExecutor();
-    final ExecutorService net = Executors.newCachedThreadPool();
+    final ExecutorService io = Guard.pool(1, this::taskFailed);
+    final ExecutorService net = Guard.pool(4, this::taskFailed);
     final Handler ui = new Handler(Looper.getMainLooper());
     SharedPreferences prefs;
     UsbManager usb;
@@ -116,6 +115,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Guard.install(getApplicationContext());
         prefs = getSharedPreferences("dt", MODE_PRIVATE);
         usb = (UsbManager) getSystemService(USB_SERVICE);
         extra = new ExtraScreens(this);
@@ -133,6 +133,37 @@ public class MainActivity extends Activity {
         render();
         handleIntent(getIntent());
         checkAppUpdate(false);
+        final String last = Guard.takeLast(this);
+        if (last != null) ui.postDelayed(() -> incidentDialog(last), 600);
+    }
+
+    /** Une tâche d'arrière-plan a échoué : on remet l'écran en ordre et on garde la trace. */
+    void taskFailed(String where, Throwable t) {
+        Guard.save(getApplicationContext(), where, t);
+        ui.post(() -> {
+            busy = false;
+            connecting = false;
+            toast("Une erreur est survenue. L'appli continue de fonctionner.");
+            try {
+                render();
+            } catch (Throwable ignored) {
+            }
+        });
+    }
+
+    void incidentDialog(final String text) {
+        try {
+            new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("Un incident a eu lieu")
+                    .setMessage("L'appli a rencontré une erreur la dernière fois. Vous pouvez copier le détail pour le signaler avec le bouton « ? ».")
+                    .setPositiveButton("Copier le détail", (d, w) -> {
+                        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        cm.setPrimaryClip(ClipData.newPlainText("Incident", text));
+                        toast("Détail copié");
+                    })
+                    .setNegativeButton("Fermer", null).show();
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override
@@ -307,6 +338,42 @@ public class MainActivity extends Activity {
     // Dessin de l'écran courant
     // =====================================================================
     void render() {
+        try {
+            renderUnsafe();
+        } catch (Throwable t) {
+            Guard.save(getApplicationContext(), "Écran " + (stack.isEmpty() ? "?" : top()), t);
+            renderFallback();
+        }
+    }
+
+    /** Écran de secours : toujours un bouton Retour, jamais d'écran vide. */
+    void renderFallback() {
+        try {
+            LinearLayout root = new LinearLayout(this);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setBackgroundColor(BG);
+            root.setPadding(dp(16), dp(24), dp(16), dp(16));
+            root.addView(tv("Cet écran n'a pas pu s'afficher.", 18, TEXT, true));
+            root.addView(tv("Rien n'est perdu et rien n'a été modifié sur la tablette. Touchez « Retour ».", 16, MUTED, false));
+            root.addView(btn("Retour", true, v -> {
+                if (stack.size() > 1) stack.remove(stack.size() - 1);
+                else {
+                    stack.clear();
+                    stack.add("HOME");
+                }
+                render();
+            }));
+            root.addView(btn("Revenir à l'accueil", false, v -> {
+                stack.clear();
+                stack.add("HOME");
+                render();
+            }));
+            setContentView(root);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    void renderUnsafe() {
         connectStatus = null;
         repairLogView = null;
         updStatusView = null;
