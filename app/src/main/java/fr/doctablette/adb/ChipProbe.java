@@ -60,6 +60,10 @@ public final class ChipProbe {
     private boolean rockCommand(int opcode, int sub, int tag) throws IOException {
         byte[] c = cbw(tag, opcode, sub);
         ch.write(c, 0, c.length);
+        return rockAnswer();
+    }
+
+    private boolean rockAnswer() throws IOException {
         byte[] s = new byte[13];
         readExact(s, 13, 3000);
         if (s[0] != 'U' || s[1] != 'S' || s[2] != 'B' || s[3] != 'S') throw new IOException("Réponse inattendue");
@@ -73,8 +77,10 @@ public final class ChipProbe {
 
     /** Rockchip : redémarre la tablette. N'efface rien. */
     public void rockchipReboot() throws IOException {
+        byte[] c = cbw(2, 0xFF, 0);
+        ch.write(c, 0, c.length); // un échec d'envoi est une vraie erreur
         try {
-            rockCommand(0xFF, 0, 2);
+            rockAnswer();
         } catch (IOException e) {
             // la tablette peut redémarrer avant de répondre : ce n'est pas une erreur
         }

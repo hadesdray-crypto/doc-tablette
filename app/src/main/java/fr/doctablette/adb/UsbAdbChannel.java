@@ -114,10 +114,11 @@ public final class UsbAdbChannel implements AdbChannel {
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
-        int done = 0;
+        int done = 0, zeros = 0;
         while (done < len) {
             int n = Math.min(16384, len - done);
             int r = conn.bulkTransfer(out, b, off + done, n, 5000);
+            if (r == 0 && ++zeros > 3) r = -1;
             if (r < 0) {
                 closed = true;
                 throw new IOException("Écriture USB impossible");

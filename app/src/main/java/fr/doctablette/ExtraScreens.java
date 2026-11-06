@@ -838,14 +838,24 @@ final class ExtraScreens {
     // ------------------------------------------------------------------
     // Puces (MediaTek, Rockchip, Allwinner, Unisoc…) : reconnaissance et tests en lecture seule
     // ------------------------------------------------------------------
-    String chipInfo = "";
-    boolean chipBusy;
-    TextView chipLine;
+    volatile String chipInfo = "";
+    volatile boolean chipBusy;
+    volatile TextView chipLine;
 
     android.hardware.usb.UsbDevice chipDevice() {
         for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
-            if (ChipDb.of(d.getVendorId(), d.getProductId()) != null) return d;
+            if (ChipDb.of(d.getVendorId(), d.getProductId()) != null && isChipMode(d)) return d;
         return null;
+    }
+
+    /** Une tablette qui démarre normalement (ADB, fastboot, MTP, disque) n'est jamais traitée comme un mode puce. */
+    static boolean isChipMode(android.hardware.usb.UsbDevice d) {
+        if (fr.doctablette.adb.UsbAdbChannel.hasAdbInterface(d) || fr.doctablette.adb.UsbAdbChannel.hasFastbootInterface(d)) return false;
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            int cl = d.getInterface(i).getInterfaceClass();
+            if (cl == 6 || cl == 8) return false;
+        }
+        return fr.doctablette.adb.UsbAdbChannel.hasBulkInterface(d);
     }
 
     void chipSay(String m) {
@@ -857,12 +867,14 @@ final class ExtraScreens {
 
     void chipScreen(LinearLayout c) {
         android.hardware.usb.UsbDevice d = chipDevice();
+        if (d == null && !chipBusy) chipInfo = "";
         if (d == null) {
             c.addView(a.tv("Aucune tablette en mode de chargement de puce n'est branchée.", 16, MainActivity.C_WARN, true));
             c.addView(a.tv("Cet écran sert aux tablettes Archos, aux tablettes chinoises et aux téléphones à puce MediaTek, Rockchip, Allwinner ou Unisoc qui ne démarrent plus.", 15, MainActivity.TEXT, false));
             return;
         }
         final ChipDb.Chip ch = ChipDb.of(d.getVendorId(), d.getProductId());
+        final String devName = d.getDeviceName();
         LinearLayout k = a.card(MainActivity.C_WARN);
         k.addView(a.tv(ch.family + " : " + ch.mode, 19, MainActivity.TEXT, true));
         k.addView(a.tv(ch.explain, 15, MainActivity.TEXT, false));
@@ -890,20 +902,20 @@ final class ExtraScreens {
             return;
         }
         final boolean mtk = d.getVendorId() == 0x0e8d;
-        c.addView(a.btn(mtk ? "Identifier la puce (lecture seule)" : "Tester la réponse de la puce (lecture seule)", true, v -> chipRun(mtk, false)));
-        if (!mtk)
-            c.addView(a.btn("Redémarrer la tablette", false, v -> a.ask("Redémarrer ?", "La tablette redémarre. Rien n'est effacé.", "Redémarrer", () -> chipRun(false, true))));
+        c.addView(a.btn(mtk ? "Identifier la puce (lecture seule)" : "Tester la réponse de la puce (lecture seule)", true, v -> chipRun(devName, mtk, false)));
+        if (!mtk && ch.family.equals("Rockchip") && d.getProductId() >= 0x3000)
+            c.addView(a.btn("Redémarrer la tablette", false, v -> a.ask("Redémarrer ?", "La tablette redémarre. Rien n'est effacé.", "Redémarrer", () -> chipRun(devName, false, true))));
     }
 
-    void chipRun(final boolean mtk, final boolean reboot) {
+    void chipRun(final String devName, final boolean mtk, final boolean reboot) {
         chipBusy = true;
         chipSay("Connexion à la tablette…");
         a.render();
         a.io.execute(() -> {
             fr.doctablette.adb.UsbAdbChannel ch = null;
             try {
-                android.hardware.usb.UsbDevice d = chipDevice();
-                if (d == null) throw new java.io.IOException("Tablette débranchée");
+                android.hardware.usb.UsbDevice d = a.usb.getDeviceList().get(devName);
+                if (d == null || !isChipMode(d)) throw new java.io.IOException("Tablette débranchée");
                 ch = fr.doctablette.adb.UsbAdbChannel.openBulk(a.usb, d);
                 fr.doctablette.adb.ChipProbe p = new fr.doctablette.adb.ChipProbe(ch);
                 if (mtk) {
@@ -917,7 +929,7 @@ final class ExtraScreens {
                     chipSay(p.rockchipReady() ? "La puce Rockchip répond correctement." : "La puce répond, mais signale qu'elle n'est pas prête.");
                 }
             } catch (Exception ex) {
-                chipSay("Échec : " + ex.getMessage() + "\nRien n'a été modifié. Débranchez, rebranchez, et réessayez.");
+                chipSay("Échec : " + (ex.getMessage() == null ? "erreur USB" : ex.getMessage()) + "\nRien n'a été modifié. Débranchez, rebranchez, et réessayez.");
             } finally {
                 if (ch != null) try {
                     ch.close();
