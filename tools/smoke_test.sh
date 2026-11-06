@@ -43,7 +43,7 @@ tap_text() { # touche le bouton ; fait défiler l'écran s'il n'est pas encore v
 home() { texts | grep -qx "Quitter"; }
 
 # Premier lancement : écran « Comment ça marche »
-texts | grep -q "Compris" || fail "écran « Comment ça marche » absent au premier lancement"
+texts | grep -q "Compris" || { echo "TEXTES VISIBLES :"; texts | head -30; adb shell dumpsys activity activities | grep -m3 -i "mResumedActivity\|topResumed"; fail "écran « Comment ça marche » absent au premier lancement"; }
 tap_text "Compris" || fail "bouton Compris"
 home || fail "retour à l'accueil après « Compris »"
 
