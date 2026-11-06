@@ -257,6 +257,7 @@ public class MainActivity extends Activity {
             case "PHOTO": return "Trouver le modèle par photo";
             case "ODIN": return "Mode Téléchargement Samsung";
             case "CHIP": return "Puces : Archos et tablettes chinoises";
+            case "RAPPORT": return "Rapport pour le client";
             default: return "Doc Tablette";
         }
     }
@@ -446,6 +447,7 @@ public class MainActivity extends Activity {
             case "PHOTO": extra.photoScreen(c); break;
             case "ODIN": extra.odinScreen(c); break;
             case "CHIP": extra.chipScreen(c); break;
+            case "RAPPORT": rapportScreen(c); break;
             default: homeScreen(c);
         }
         setContentView(root);
@@ -739,7 +741,45 @@ public class MainActivity extends Activity {
             if (!allOk) c.addView(btn("Tout réparer", true, v -> go("REPAIR")));
             else c.addView(tv("Tout est en bon état.", 16, C_OK, true));
         }
+        if (bilan != null) c.addView(btn("Rapport pour le client", false, v -> go("RAPPORT")));
         c.addView(btn(bilan == null ? "Lancer le bilan" : "Refaire le bilan", bilan == null, v -> runBilan()));
+    }
+
+    // =====================================================================
+    // Rapport client : texte sans aucune donnée personnelle (ni numéro de série, ni identifiant)
+    // =====================================================================
+    String rapportText() {
+        StringBuilder sb = new StringBuilder("RAPPORT D'ÉTAT DE LA TABLETTE\n");
+        if (bilan == null) return sb.append("\nAucun bilan n'a été fait.").toString();
+        sb.append(bilan.title()).append("\n\nÉtat constaté :\n");
+        for (Bilan.Item it : bilan.items()) {
+            String etat = it.level == Bilan.BAD ? "à traiter" : it.level == Bilan.WARN ? "à améliorer" : "bon";
+            sb.append("- ").append(it.label).append(" : ").append(it.value).append(" (").append(etat).append(")\n");
+        }
+        String log = repairLog.toString().trim();
+        sb.append("\nInterventions faites :\n").append(log.isEmpty() ? "- aucune pour l'instant\n" : log + "\n");
+        sb.append("\nÉtabli avec Doc Tablette. Aucune donnée personnelle n'a été lue ni conservée.");
+        return sb.toString();
+    }
+
+    void rapportScreen(LinearLayout c) {
+        c.addView(tv("Ce texte résume l'état de la tablette. Il ne contient ni numéro de série, ni identifiant, ni contenu personnel. Relisez-le avant de le montrer.", 14, MUTED, false));
+        LinearLayout k = card(0);
+        k.addView(tv(rapportText(), 15, TEXT, false));
+        c.addView(k);
+        c.addView(btn("Copier le rapport", true, v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("Rapport", rapportText()));
+            toast("Rapport copié");
+        }));
+        c.addView(btn("Partager le rapport", false, v -> {
+            try {
+                Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, rapportText());
+                startActivity(Intent.createChooser(i, "Partager le rapport"));
+            } catch (Throwable t) {
+                toast("Aucune appli pour partager");
+            }
+        }));
     }
 
     // =====================================================================
