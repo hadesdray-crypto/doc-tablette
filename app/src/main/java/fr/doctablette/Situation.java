@@ -62,7 +62,7 @@ final class Situation {
                         "N'utilisez « Wipe data / factory reset » qu'en dernier : cela efface TOUT (photos, vidéos, applis).",
                         "Quand c'est fini, choisissez « Reboot system now »."},
                 "« Wipe cache » : rien de personnel. « Factory reset » : tout est effacé.", "recovery", false);
-        if (adb && authRefused) return new Situation(UNAUTHORIZED, "La tablette refuse la connexion",
+        if (adb && authRefused && !connectedOk) return new Situation(UNAUTHORIZED, "La tablette refuse la connexion",
                 "La tablette n'a pas été autorisée à parler avec ce téléphone.",
                 new String[]{"Débranchez puis rebranchez le câble.", "Sur la tablette, quand « Autoriser le débogage USB ? » apparaît, cochez « Toujours autoriser » et touchez « Autoriser ».",
                         "Si rien n'apparaît : Paramètres, Options pour les développeurs, « Révoquer les autorisations de débogage USB », puis rebranchez."},

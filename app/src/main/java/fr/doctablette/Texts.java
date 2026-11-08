@@ -9,7 +9,7 @@ final class Texts {
             "1. Sur la tablette : activez le « débogage USB » (voir « Aide : brancher la tablette »).\n\n"
                     + "2. Branchez la tablette à ce téléphone avec le câble. Sur la tablette, touchez « Autoriser » (cochez « Toujours autoriser »).\n\n"
                     + "3. Touchez « Bilan » pour voir la santé de la tablette, puis « Tout réparer ».\n\n"
-                    + "Rien n'est envoyé sur Internet : tout se passe entre le téléphone et la tablette.";
+                    + "Le contenu de la tablette ne quitte jamais le téléphone. Internet ne sert qu'à vérifier les mises à jour de Doc Tablette.";
 
     static final String HELP =
             "ACTIVER LE DÉBOGAGE USB SUR LA TABLETTE (une seule fois)\n"

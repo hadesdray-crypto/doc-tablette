@@ -34,6 +34,7 @@ public final class StepRunner {
                 if (step.id.equals("reboot") && (m.contains("coupée") || m.contains("Pas de connexion"))) {
                     return new Result(true, "");
                 }
+                if (m.contains("Arrêté à votre demande")) return new Result(false, "arrêté");
                 if (m.contains("coupée") || m.contains("débranchée") || m.contains("Pas de connexion")) {
                     return new Result(false, "La tablette a été débranchée");
                 }

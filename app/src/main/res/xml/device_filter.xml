@@ -4,14 +4,21 @@
     <usb-device class="255" subclass="66" protocol="1" />
     <!-- Mode bootloader (fastboot) : protocole 3 -->
     <usb-device class="255" subclass="66" protocol="3" />
-    <!-- Tablette branchée comme appareil photo / transfert de fichiers (PTP, MTP) -->
-    <usb-device class="6" subclass="1" />
-    <!-- Mode Téléchargement Samsung (Odin) -->
-    <usb-device vendor-id="1256" />
-    <!-- Modes de chargement de puces : MediaTek, Rockchip, Allwinner, Unisoc, Qualcomm -->
-    <usb-device vendor-id="3725" />
-    <usb-device vendor-id="8711" />
-    <usb-device vendor-id="7994" />
-    <usb-device vendor-id="6018" />
-    <usb-device vendor-id="1478" />
+    <!-- Mode Téléchargement Samsung (Odin) : 04e8:685d seulement -->
+    <usb-device vendor-id="1256" product-id="26717" />
+    <!-- MediaTek : BootROM 0e8d:0003, préchargeur 0e8d:2000 / 0e8d:2001 -->
+    <usb-device vendor-id="3725" product-id="3" />
+    <usb-device vendor-id="3725" product-id="8192" />
+    <usb-device vendor-id="3725" product-id="8193" />
+    <!-- Rockchip : modes Maskrom / Loader courants (2207:3xxx) -->
+    <usb-device vendor-id="8711" product-id="12298" />
+    <usb-device vendor-id="8711" product-id="12554" />
+    <usb-device vendor-id="8711" product-id="13068" />
+    <usb-device vendor-id="8711" product-id="13070" />
+    <!-- Allwinner FEL 1f3a:efe8 -->
+    <usb-device vendor-id="7994" product-id="61416" />
+    <!-- Qualcomm EDL 05c6:9008 -->
+    <usb-device vendor-id="1478" product-id="36872" />
+    <!-- Unisoc 1782:4d00 -->
+    <usb-device vendor-id="6018" product-id="19712" />
 </resources>

@@ -33,6 +33,12 @@ final class TabletLink {
         return c != null && !c.isClosed();
     }
 
+    /** Arrête la commande en cours sans couper la connexion. */
+    void abortCurrent() {
+        AdbConnection c = cx;
+        if (c != null) c.abortCurrent();
+    }
+
     void disconnect() {
         AdbConnection c = cx;
         cx = null;
@@ -111,8 +117,22 @@ final class TabletLink {
         } catch (IOException ignored) {
         }
         label = model.isEmpty() ? "Tablette" : model;
-        key = (model + "_" + serial).replaceAll("[^A-Za-z0-9_.-]", "");
+        key = fingerprint(model, serial);
         cb.connected(label);
+    }
+
+    /** Empreinte anonyme de la tablette : le numéro de série n'est jamais gardé en clair sur le téléphone. */
+    static String fingerprint(String model, String serial) {
+        String m = model.replaceAll("[^A-Za-z0-9_.-]", "");
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] h = md.digest((model + "\n" + serial).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 8; i++) sb.append(String.format("%02x", h[i]));
+            return m + "_" + sb;
+        } catch (Exception e) {
+            return m + "_" + Integer.toHexString(serial.hashCode());
+        }
     }
 
     static String explain(Exception e) {

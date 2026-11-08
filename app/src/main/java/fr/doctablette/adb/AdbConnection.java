@@ -193,6 +193,12 @@ public final class AdbConnection {
     }
 
     private Progress progress;
+    private volatile boolean abortRequested;
+
+    /** Demande l'arrêt de la commande en cours : son flux est fermé proprement au prochain tour de boucle. */
+    public void abortCurrent() {
+        abortRequested = true;
+    }
 
     public void setProgress(Progress p) {
         this.progress = p;
@@ -207,6 +213,7 @@ public final class AdbConnection {
     /** Comme run, mais la sortie va directement dans un flux (photos, vidéos : pas de limite de taille en mémoire). */
     public synchronized void stream(String service, InputStream stdin, java.io.OutputStream out, long timeoutMs) throws IOException {
         if (closed) throw new IOException("Pas de connexion");
+        abortRequested = false;
         final int local = nextLocal++;
         byte[] svc = service.getBytes(StandardCharsets.UTF_8);
         byte[] svcz = new byte[svc.length + 1];
@@ -219,6 +226,14 @@ public final class AdbConnection {
         long sent = 0;
         byte[] buf = new byte[peerMaxData];
         while (true) {
+            if (abortRequested) {
+                abortRequested = false;
+                try {
+                    send(A_CLSE, local, remote, new byte[0], 0);
+                } catch (IOException ignored) {
+                }
+                throw new IOException("Arrêté à votre demande");
+            }
             if (System.currentTimeMillis() > deadline) {
                 try {
                     send(A_CLSE, local, remote, new byte[0], 0);

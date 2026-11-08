@@ -42,8 +42,18 @@ final class Backup {
         return "'" + s.replace("'", "'\\''") + "'";
     }
 
-    /** Liste les fichiers. Méthode 1 : taille connue. Méthode 2 : noms seulement. */
+    /** Ajoute, pour chaque dossier de la mémoire interne, le même dossier sur une éventuelle carte microSD. */
+    static String withSdCard(String dirs) {
+        StringBuilder sb = new StringBuilder(dirs);
+        for (String d : dirs.trim().split("\\s+")) {
+            if (d.startsWith("/sdcard/")) sb.append(" /storage/[0-9A-F][0-9A-F][0-9A-F][0-9A-F]-*/").append(d.substring(8));
+        }
+        return sb.toString();
+    }
+
+    /** Liste les fichiers. Méthode 1 : taille connue. Méthode 2 : noms seulement. Méthode 3 (vieilles tablettes) : ls -lR. */
     static List<Item> scan(TabletLink link, String dirs) throws IOException {
+        dirs = withSdCard(dirs);
         List<Item> out = new ArrayList<>();
         String a = link.sh("find " + dirs + " -type f -not -name '.*' -exec stat -c '%s|%n' {} + 2>/dev/null", 180000);
         for (String line : a.split("\n")) {
@@ -67,11 +77,46 @@ final class Backup {
             it.rel = rel(line);
             out.add(it);
         }
+        if (!out.isEmpty()) return out;
+        String c = link.sh("ls -lR " + dirs + " 2>/dev/null", 180000);
+        parseLsR(c, out);
         return out;
     }
 
+    /** Lecture de « ls -lR » (toolbox ou toybox) : la taille est le champ juste avant la date. */
+    static void parseLsR(String text, List<Item> out) {
+        String dir = null;
+        for (String raw : text.split("\n")) {
+            String line = raw.replace("\r", "");
+            if (line.startsWith("/") && line.endsWith(":")) {
+                dir = line.substring(0, line.length() - 1);
+                continue;
+            }
+            if (dir == null || !line.startsWith("-")) continue;
+            String[] t = line.trim().split("\\s+");
+            int date = -1;
+            for (int i = 0; i < t.length; i++) if (t[i].matches("\\d{4}-\\d{2}-\\d{2}")) { date = i; break; }
+            if (date < 2 || date + 2 >= t.length) continue;
+            StringBuilder name = new StringBuilder();
+            for (int i = date + 2; i < t.length; i++) name.append(i > date + 2 ? " " : "").append(t[i]);
+            if (name.length() == 0 || name.charAt(0) == '.') continue;
+            Item it = new Item();
+            try {
+                it.size = Long.parseLong(t[date - 1]);
+            } catch (NumberFormatException e) {
+                it.size = -1;
+            }
+            it.path = dir + "/" + name;
+            it.rel = rel(it.path);
+            out.add(it);
+        }
+    }
+
     static String rel(String p) {
-        return p.startsWith("/sdcard/") ? p.substring(8) : p.replaceFirst("^/+", "");
+        if (p.startsWith("/sdcard/")) return p.substring(8);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^/storage/([^/]+)/(.*)$").matcher(p);
+        if (m.matches()) return "Carte-SD_" + m.group(1) + "/" + m.group(2);
+        return p.replaceFirst("^/+", "");
     }
 
     private final Context ctx;
@@ -195,6 +240,11 @@ final class Backup {
                         if (l != null) l.progress(num, items.size(), it.rel, base + out.count, tot);
                     } catch (IOException e) {
                         last = e;
+                        String em = e.getMessage() == null ? "" : e.getMessage();
+                        if (em.contains("Commande refusée")) {
+                            last = new IOException("Cette tablette est trop ancienne pour la copie par câble (Android 4). Utilisez le mode « Transfert de fichiers » et l'appli Fichiers du téléphone.");
+                            attempt = 2;
+                        }
                         if (f != null) try {
                             DocumentsContract.deleteDocument(cr, f);
                         } catch (Exception ignored) {

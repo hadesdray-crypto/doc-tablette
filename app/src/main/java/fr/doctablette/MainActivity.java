@@ -210,9 +210,10 @@ public class MainActivity extends Activity {
             return;
         }
         if (top().equals("REPAIR") && busy) {
-            ask("Arrêter ?", "Une réparation est en cours. Voulez-vous l'arrêter ?", "Arrêter", () -> {
-                cancel = true;
-                logLine("Arrêt demandé…");
+            ask("Arrêter ?", "Une réparation est en cours. Voulez-vous l'arrêter et revenir en arrière ?", "Arrêter", () -> {
+                stopRepair();
+                if (stack.size() > 1) stack.remove(stack.size() - 1);
+                render();
             });
             return;
         }
@@ -267,6 +268,28 @@ public class MainActivity extends Activity {
     // =====================================================================
     int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    /** Brouillons de saisie : ce que l'on tape survit à un rafraîchissement d'écran (câble qui bouge, rotation). */
+    final java.util.HashMap<String, String> drafts = new java.util.HashMap<>();
+
+    void keepDraft(final String id, final EditText e) {
+        String d = drafts.get(id);
+        if (d != null && e.getText().length() == 0) {
+            e.setText(d);
+            e.setSelection(d.length());
+        }
+        e.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int n) {
+            }
+
+            public void onTextChanged(CharSequence c, int a, int b, int n) {
+                drafts.put(id, c.toString());
+            }
+
+            public void afterTextChanged(android.text.Editable ed) {
+            }
+        });
     }
 
     TextView tv(String t, float sp, int color, boolean bold) {
@@ -600,6 +623,7 @@ public class MainActivity extends Activity {
         public void connected(String l) {
             ui.post(() -> {
                 connecting = false;
+                extra.authRefused = false;
                 connectMsg = "Connecté : " + l;
                 render();
             });
@@ -663,6 +687,7 @@ public class MainActivity extends Activity {
         wifiField.setTextColor(TEXT);
         wifiField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         wifiField.setSingleLine(true);
+        keepDraft("wifi", wifiField);
         c.addView(wifiField, new LinearLayout.LayoutParams(MATCH, WRAP));
         c.addView(btn("Connexion Wi-Fi", false, v -> {
             String host = wifiField.getText().toString().trim();
@@ -758,7 +783,7 @@ public class MainActivity extends Activity {
         }
         String log = repairLog.toString().trim();
         sb.append("\nInterventions faites :\n").append(log.isEmpty() ? "- aucune pour l'instant\n" : log + "\n");
-        sb.append("\nÉtabli avec Doc Tablette. Aucune donnée personnelle n'a été lue ni conservée.");
+        sb.append("\nÉtabli avec Doc Tablette. Ce rapport ne contient aucune donnée personnelle (ni numéro de série, ni contenu de la tablette).");
         return sb.toString();
     }
 
@@ -803,10 +828,7 @@ public class MainActivity extends Activity {
             ask("Tout réparer ?", sb.toString(), "Lancer", () -> runSteps(Repairs.all()));
         }));
         if (busy) {
-            c.addView(btn("Arrêter", false, v -> {
-                cancel = true;
-                logLine("Arrêt demandé…");
-            }));
+            c.addView(btn("Arrêter", false, v -> stopRepair()));
         }
         c.addView(tv("Une réparation à la fois", 16, TEXT, true));
         Repairs.Step[] singles = {Repairs.CACHES, Repairs.BACKGROUND, Repairs.ANIMS, Repairs.OPTIMIZE};
@@ -818,7 +840,7 @@ public class MainActivity extends Activity {
             c.addView(tv(s.explain, 13, MUTED, false));
         }
         c.addView(btn("Annuler mes réglages (animations, applis)", false, v -> {
-            if (!busy) ask("Annuler ?", "Remet les animations d'origine et réactive les applis que vous avez désactivées avec Doc Tablette.", "Annuler les réglages", this::undoAll);
+            if (!busy) ask("Annuler ?", "Remet les animations d'origine, réactive les applis désactivées et remet les applis livrées avec la tablette qui ont été retirées avec Doc Tablette.", "Annuler les réglages", this::undoAll);
         }));
         c.addView(btn("Redémarrer la tablette", false, v -> {
             if (!busy) ask("Redémarrer ?", "La tablette va redémarrer et la connexion sera coupée.", "Redémarrer", () -> runSteps(Collections.singletonList(Repairs.REBOOT)));
@@ -831,6 +853,14 @@ public class MainActivity extends Activity {
 
     StepRunner.Shell shell() {
         return (cmd, t) -> link.sh(cmd, t);
+    }
+
+    /** Arrêt réel : la commande en cours sur la tablette est fermée, pas seulement la suivante. */
+    void stopRepair() {
+        if (!busy || cancel) return;
+        cancel = true;
+        logLine("Arrêt demandé…");
+        link.abortCurrent();
     }
 
     void runSteps(List<Repairs.Step> steps) {
@@ -908,6 +938,23 @@ public class MainActivity extends Activity {
                             Set<String> left = new HashSet<>(prefs.getStringSet("disabled_" + link.key, new HashSet<>()));
                             left.remove(p);
                             prefs.edit().putStringSet("disabled_" + link.key, left).apply();
+                        }
+                    } catch (IOException e) {
+                        logLine("  impossible : " + e.getMessage());
+                    }
+                }
+                Set<String> rem = new HashSet<>(prefs.getStringSet("removed_" + link.key, new HashSet<>()));
+                for (String p : rem) {
+                    if (!p.matches("[A-Za-z0-9._]+")) continue;
+                    logLine("- Remettre " + p + "…");
+                    try {
+                        String out = link.sh("cmd package install-existing " + p, 30000);
+                        boolean ok = !Repairs.failed(out) && !out.toLowerCase().contains("doesn't exist") && !out.toLowerCase().contains("failure");
+                        logLine(ok ? "  terminé" : "  impossible : " + out.trim());
+                        if (ok) {
+                            Set<String> left = new HashSet<>(prefs.getStringSet("removed_" + link.key, new HashSet<>()));
+                            left.remove(p);
+                            prefs.edit().putStringSet("removed_" + link.key, left).apply();
                         }
                     } catch (IOException e) {
                         logLine("  impossible : " + e.getMessage());
@@ -1012,7 +1059,7 @@ public class MainActivity extends Activity {
                     String it = items[which];
                     if (it.equals("Annuler")) return;
                     if (it.startsWith("Désinstaller")) {
-                        ask("Désinstaller ?", r.pkg + "\n\nL'appli et ses données seront retirées de la tablette (réinstallable depuis le Play Store).", "Désinstaller", () -> appCommand(r, "uninstall"));
+                        ask("Désinstaller ?", r.pkg + "\n\nL'appli et ses données seront retirées de la tablette.\n\nSi c'est une appli installée par vous : réinstallable depuis le Play Store.\nSi c'est une appli livrée avec la tablette : elle sera seulement retirée pour l'utilisateur, et « Annuler mes réglages » pourra la remettre.", "Désinstaller", () -> appCommand(r, "uninstall"));
                     } else if (it.startsWith("Désactiver")) {
                         ask("Désactiver ?", "L'appli disparaît et ne tourne plus. Vous pourrez la réactiver ici.", "Désactiver", () -> appCommand(r, "disable"));
                     } else if (it.startsWith("Réactiver")) {
@@ -1054,7 +1101,15 @@ public class MainActivity extends Activity {
                         break;
                     default:
                         out = link.sh("pm uninstall " + r.pkg, 60000);
-                        if (!out.contains("Success")) out = link.sh("pm uninstall --user 0 " + r.pkg, 60000);
+                        if (!out.contains("Success")) {
+                            out = link.sh("pm uninstall --user 0 " + r.pkg, 60000);
+                            if (out.contains("Success")) {
+                                // appli système retirée pour l'utilisateur seulement : on note le paquet pour pouvoir la remettre
+                                Set<String> s = new HashSet<>(prefs.getStringSet("removed_" + link.key, new HashSet<>()));
+                                s.add(r.pkg);
+                                prefs.edit().putStringSet("removed_" + link.key, s).apply();
+                            }
+                        }
                 }
                 boolean ok = !Repairs.failed(out) && !out.contains("Failure");
                 res = ok ? "Fait : " + r.pkg : "La tablette a refusé : " + out.trim();
@@ -1186,6 +1241,7 @@ public class MainActivity extends Activity {
                     setUpd("Installation sur la tablette…", -1);
                     out = link.sh("pm install -r /data/local/tmp/dt-install.apk; rm -f /data/local/tmp/dt-install.apk", 300000);
                 }
+                cx.setProgress(null);
                 final String res = out;
                 setUpd("", -1);
                 ui.post(() -> {
@@ -1293,11 +1349,13 @@ public class MainActivity extends Activity {
         code.setTextColor(TEXT);
         code.setSingleLine(true);
         code.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        keepDraft("licence", code);
         c.addView(code, new LinearLayout.LayoutParams(MATCH, WRAP));
         c.addView(btn("Activer", true, v -> {
             String s = code.getText().toString();
             if (LicenseCodec.verify(BuildConfig.LICENSE_SECRET, s)) {
                 prefs.edit().putString("licence", s.trim()).apply();
+                drafts.remove("licence");
                 toast("Licence activée");
                 render();
             } else {

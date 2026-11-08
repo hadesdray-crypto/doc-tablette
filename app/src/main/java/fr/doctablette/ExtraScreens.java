@@ -222,6 +222,10 @@ final class ExtraScreens {
                 if (backupLine != null) backupLine.setText("Copie " + n + " / " + total + "\n" + name);
                 if (backupBar != null && bytes > 0) backupBar.setProgress((int) (1000L * done / bytes));
             }));
+            try {
+                if (a.link.cx != null) a.link.cx.setIdleExtend(0);
+            } catch (Exception ignored) {
+            }
             StringBuilder sb = new StringBuilder();
             sb.append(r.cancelled ? "Copie arrêtée.\n" : "Copie terminée.\n");
             sb.append(r.copied).append(" copiés (").append(mo(r.bytes)).append("), ").append(r.skipped).append(" déjà présents, ").append(r.failed).append(" en échec.");
@@ -290,6 +294,7 @@ final class ExtraScreens {
         e.setHintTextColor(MainActivity.MUTED);
         e.setTextColor(MainActivity.TEXT);
         e.setSingleLine(true);
+        a.keepDraft("modele", e);
         c.addView(e, new LinearLayout.LayoutParams(MainActivity.MATCH, MainActivity.WRAP));
         c.addView(a.btn("Chercher", false, v -> {
             String t = e.getText().toString().trim();
@@ -304,6 +309,7 @@ final class ExtraScreens {
                 cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "doc-tablette-etiquette-" + System.currentTimeMillis() + ".jpg");
                 cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
                 cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Doc Tablette");
+                cv.put(android.provider.MediaStore.Images.Media.IS_PENDING, 1);
                 photoUri = a.getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
                 Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
                 i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, photoUri);
@@ -320,6 +326,18 @@ final class ExtraScreens {
 
     void onPhoto(int req, boolean ok, Intent data) {
         Uri u = req == REQ_PHOTO ? photoUri : (data == null ? null : data.getData());
+        if (req == REQ_PHOTO && photoUri != null) {
+            try {
+                if (ok) {
+                    android.content.ContentValues cv = new android.content.ContentValues();
+                    cv.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0);
+                    a.getContentResolver().update(photoUri, cv, null, null);
+                } else {
+                    a.getContentResolver().delete(photoUri, null, null); // photo annulée : pas d'image vide dans la galerie
+                }
+            } catch (Exception ignored) {
+            }
+        }
         if (!ok || u == null) {
             scanMsg = "Aucune photo.";
             a.render();
@@ -639,6 +657,7 @@ final class ExtraScreens {
         e.setSingleLine(true);
         e.setInputType(InputType.TYPE_CLASS_TEXT);
         e.setText(guideQuery);
+        a.keepDraft("guide", e);
         c.addView(e, new LinearLayout.LayoutParams(MainActivity.MATCH, MainActivity.WRAP));
         c.addView(a.btn("Chercher", true, v -> {
             guideQuery = e.getText().toString();

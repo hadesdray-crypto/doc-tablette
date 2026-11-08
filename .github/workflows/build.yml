@@ -76,15 +76,6 @@ jobs:
           name: doc-tablette-apk
           path: doc-tablette.apk
 
-      - name: Publier la version (mise à jour sur place)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          N: ${{ github.run_number }}
-        run: |
-          python3 tools/make_update_json.py "$N" "1.0.$N" "https://github.com/${{ github.repository }}/releases/download/v$N/doc-tablette.apk" doc-tablette.apk release-notes.txt > update.json
-          cat update.json
-          gh release create "v$N" doc-tablette.apk update.json --title "Doc Tablette 1.0.$N" --notes-file release-notes.txt --latest
-
   emulateur:
     needs: build
     runs-on: ubuntu-latest
@@ -106,3 +97,22 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: bash tools/smoke_test.sh doc-tablette.apk
+
+  publier:
+    needs: [build, emulateur]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: doc-tablette-apk
+      - name: Publier la version (mise à jour sur place) — seulement si le test sur téléphone virtuel a réussi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.run_number }}
+        run: |
+          python3 tools/make_update_json.py "$N" "1.0.$N" "https://github.com/${{ github.repository }}/releases/download/v$N/doc-tablette.apk" doc-tablette.apk release-notes.txt > update.json
+          cat update.json
+          gh release create "v$N" doc-tablette.apk update.json --title "Doc Tablette 1.0.$N" --notes-file release-notes.txt --latest
