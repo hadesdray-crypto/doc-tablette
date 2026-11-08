@@ -15,16 +15,14 @@ final class Situation {
     final String[] steps;    // la procédure
     final String erases;     // ce qui sera effacé : phrase claire
     final String query;      // mot de recherche pour le guide
-    final boolean canBackupByAdb;
 
-    Situation(int kind, String title, String text, String[] steps, String erases, String query, boolean canBackup) {
+    Situation(int kind, String title, String text, String[] steps, String erases, String query) {
         this.kind = kind;
         this.title = title;
         this.text = text;
         this.steps = steps;
         this.erases = erases;
         this.query = query;
-        this.canBackupByAdb = canBackup;
     }
 
     // Identifiants USB courants des modes « bas niveau » (fabricant:produit). Indicatif.
@@ -55,57 +53,57 @@ final class Situation {
         if (adb && b.startsWith("sideload")) return new Situation(SIDELOAD, "La tablette est en mode « sideload »",
                 "Elle attend qu'on lui envoie un fichier de mise à jour. Ce n'est pas un mode de réparation normal.",
                 new String[]{"Sur la tablette, choisissez « Reboot system now » avec les touches volume puis marche."},
-                "Rien tant que vous n'envoyez pas de fichier.", "recovery", false);
+                "Rien tant que vous n'envoyez pas de fichier.", "recovery");
         if (adb && b.startsWith("recovery")) return new Situation(RECOVERY, "La tablette est en mode récupération",
                 "C'est le menu de secours de la tablette. Depuis ici on peut vider le cache, ou tout effacer (attention).",
                 new String[]{"Avec les touches volume, choisissez « Wipe cache partition » : cela n'efface aucune photo ni appli.",
                         "N'utilisez « Wipe data / factory reset » qu'en dernier : cela efface TOUT (photos, vidéos, applis).",
                         "Quand c'est fini, choisissez « Reboot system now »."},
-                "« Wipe cache » : rien de personnel. « Factory reset » : tout est effacé.", "recovery", false);
+                "« Wipe cache » : rien de personnel. « Factory reset » : tout est effacé.", "recovery");
         if (adb && authRefused && !connectedOk) return new Situation(UNAUTHORIZED, "La tablette refuse la connexion",
                 "La tablette n'a pas été autorisée à parler avec ce téléphone.",
                 new String[]{"Débranchez puis rebranchez le câble.", "Sur la tablette, quand « Autoriser le débogage USB ? » apparaît, cochez « Toujours autoriser » et touchez « Autoriser ».",
                         "Si rien n'apparaît : Paramètres, Options pour les développeurs, « Révoquer les autorisations de débogage USB », puis rebranchez."},
-                "Rien n'est effacé.", "débogage USB", false);
+                "Rien n'est effacé.", "débogage USB");
         if (adb) return new Situation(ADB, connectedOk ? "Tablette prête" : "Tablette trouvée (débogage actif)",
                 "La tablette parle avec le téléphone. On peut faire le bilan, sauvegarder les photos et réparer.",
                 new String[]{"Conseil : sauvegardez d'abord les photos et vidéos.", "Ensuite faites le bilan, puis « Tout réparer »."},
-                "Le bilan et la sauvegarde n'effacent rien. « Tout réparer » ne touche ni aux photos, ni aux vidéos : il vide seulement les fichiers temporaires.", "lente", true);
+                "Le bilan et la sauvegarde n'effacent rien. « Tout réparer » ne touche ni aux photos, ni aux vidéos : il vide seulement les fichiers temporaires.", "lente");
         if (fastboot) return new Situation(FASTBOOT, "La tablette est en mode bootloader (fastboot)",
                 "C'est un mode pour installer un système. Il ne montre pas les photos. Ce n'est pas un mode de réparation simple.",
                 new String[]{"Pour en sortir : maintenez la touche marche jusqu'au redémarrage (10 à 20 secondes).", "Si elle revient toujours ici, cherchez le modèle dans le guide."},
-                "Rien tant que vous n'installez rien.", "bootloader fastboot", false);
-        if (cdc && d.getVendorId() == 0x04e8 && !mtp) return new Situation(ODIN, "La tablette Samsung est en mode Téléchargement",
+                "Rien tant que vous n'installez rien.", "bootloader fastboot");
+        if (cdc && d.getVendorId() == 0x04e8 && d.getProductId() == 0x685d && !mtp) return new Situation(ODIN, "La tablette Samsung est en mode Téléchargement",
                 "C'est l'écran bleu « Downloading… » ou d'avertissement. Il sert à réinstaller le système Samsung. Si ce n'était pas voulu, on peut simplement en sortir.",
                 new String[]{"Pour en sortir : touchez « Quitter le mode Téléchargement » (rien n'est effacé).", "Sinon : maintenez Volume bas + Marche pendant 10 secondes.", "Si la tablette revient toujours ici, ouvrez le guide : boucle de démarrage."},
-                "Quitter ce mode n'efface rien. Réinstaller le système, lui, efface tout.", "mode téléchargement", false);
+                "Quitter ce mode n'efface rien. Réinstaller le système, lui, efface tout.", "mode téléchargement");
         String low = lowLevel(d);
         if (low != null) return new Situation(DOWNLOAD, "Mode bas niveau détecté : " + low,
                 "La tablette est dans un mode de réinstallation du système. Un téléphone seul ne peut pas la réparer ici : il faut un ordinateur et le bon logiciel du fabricant.",
                 new String[]{"Ne réinstallez rien sans connaître le modèle exact.", "Cherchez le modèle dans le guide : section « Remettre le système d'origine »."},
-                "Une réinstallation du système efface TOUT (photos, vidéos, applis).", "firmware", false);
+                "Une réinstallation du système efface TOUT (photos, vidéos, applis).", "firmware");
         if (mtp) return new Situation(MTP, "La tablette est branchée comme une clé de transfert (MTP)",
                 "Les photos peuvent se copier, mais le mode réparation n'est pas activé. Le débogage USB est éteint.",
                 new String[]{"Pour réparer : activez le « Débogage USB » sur la tablette (voir l'aide).", "Pour seulement récupérer des photos, utilisez le guide « Récupérer photos et vidéos »."},
-                "Rien n'est effacé.", "récupérer photos", false);
+                "Rien n'est effacé.", "récupérer photos");
         if (storage) return new Situation(STORAGE, "La tablette est branchée comme un disque",
                 "Les fichiers sont lisibles par le téléphone via le gestionnaire de fichiers.",
-                new String[]{"Ouvrez l'appli « Fichiers » du téléphone pour copier les photos."}, "Rien n'est effacé.", "récupérer photos", false);
+                new String[]{"Ouvrez l'appli « Fichiers » du téléphone pour copier les photos."}, "Rien n'est effacé.", "récupérer photos");
         return new Situation(UNKNOWN, "Un appareil USB est branché, mais je ne le reconnais pas",
                 "Ce peut être un câble de charge seule, ou une tablette dans un mode inconnu.",
                 new String[]{"Essayez un autre câble (qui transmet les données).", "Sur la tablette, tirez le bandeau du haut : choisissez « Transfert de fichiers »."},
-                "Rien n'est effacé.", "câble", false);
+                "Rien n'est effacé.", "câble");
     }
 
     static Situation nothing(boolean hostOk) {
         if (!hostOk) return new Situation(NONE, "Ce téléphone ne peut pas piloter une tablette",
-                "Il ne gère pas le mode « hôte USB ». Essayez un autre téléphone.", new String[]{}, "Rien.", "OTG", false);
+                "Il ne gère pas le mode « hôte USB ». Essayez un autre téléphone.", new String[]{}, "Rien.", "OTG");
         return new Situation(NONE, "Je ne vois aucune tablette",
                 "Si l'écran de la tablette est noir, c'est peut-être qu'elle est éteinte ou que le câble ne transmet pas les données.",
                 new String[]{"Vérifiez que l'adaptateur est bien enfoncé des deux côtés.", "Essayez le câble de la tablette (celui du chargeur) avec un adaptateur.",
                         "Laissez-la charger 30 minutes, puis appuyez 10 secondes sur la touche marche.",
                         "Toujours rien ? Ouvrez le guide « Ne s'allume pas »."},
-                "Rien n'est effacé.", "ne s'allume pas", false);
+                "Rien n'est effacé.", "ne s'allume pas");
     }
 
     static Situation best(Map<String, UsbDevice> all, String banner, boolean connected, boolean authRefused, boolean hostOk) {

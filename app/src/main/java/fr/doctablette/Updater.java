@@ -81,6 +81,7 @@ final class Updater {
             try {
                 long have = part.exists() ? part.length() : 0;
                 HttpURLConnection c = open(info.url, have);
+                try {
                 int code = c.getResponseCode();
                 if (code == 416) {
                     part.delete();
@@ -99,7 +100,9 @@ final class Updater {
                         if (total > 0 && pr != null) pr.percent((int) (100 * got / total));
                     }
                 }
-                c.disconnect();
+                } finally {
+                    c.disconnect();
+                }
                 if (!info.sha256.isEmpty() && !sha256(part).equalsIgnoreCase(info.sha256)) {
                     part.delete();
                     throw new IOException("Fichier incomplet ou abîmé, nouveau téléchargement");
@@ -128,22 +131,6 @@ final class Updater {
         return sb.toString();
     }
 
-    /** Garde une copie de la version actuelle avant de la remplacer. */
-    static void backupCurrent(Context ctx) {
-        try {
-            File src = new File(ctx.getApplicationInfo().sourceDir);
-            File dir = new File(ctx.getFilesDir(), "sauvegarde");
-            dir.mkdirs();
-            File dst = new File(dir, "doc-tablette-precedente.apk");
-            try (InputStream in = new FileInputStream(src); OutputStream out = new FileOutputStream(dst)) {
-                byte[] b = new byte[16384];
-                int n;
-                while ((n = in.read(b)) > 0) out.write(b, 0, n);
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
     /** Installation sur place par le système (une seule confirmation). */
     static void install(Context ctx, File apk, String action) throws IOException {
         PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
@@ -160,6 +147,12 @@ final class Updater {
             Intent i = new Intent(action).setPackage(ctx.getPackageName());
             PendingIntent pe = PendingIntent.getBroadcast(ctx, id, i, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             s.commit(pe.getIntentSender());
+        } catch (IOException | RuntimeException e) {
+            try {
+                pi.abandonSession(id); // pas de session d'installation qui traîne
+            } catch (Exception ignored) {
+            }
+            throw e;
         }
     }
 }

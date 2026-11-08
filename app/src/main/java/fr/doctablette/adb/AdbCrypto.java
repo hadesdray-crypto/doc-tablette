@@ -100,13 +100,4 @@ public final class AdbCrypto {
             dst[off + i] = idx >= 0 ? be[idx] : 0;
         }
     }
-
-    // Pour les tests
-    RSAPublicKey publicKey() {
-        return pub;
-    }
-
-    static void throwIf(boolean c, String m) throws IOException {
-        if (c) throw new IOException(m);
-    }
 }

@@ -13,7 +13,7 @@ public class LogicTest {
         int warn = 0, bad = 0; for (Bilan.Item i : b.items()) { if (i.level == Bilan.WARN) warn++; if (i.level == Bilan.BAD) bad++; }
         check("stockage 19 % et memoire 10 % signales en orange, animations aussi, rien en rouge", warn == 3 && bad == 0);
         check("reponse vide = pas valide (pas de plantage)", !Bilan.parse("").looksValid() && Bilan.parse("\n\n===BAT\nlevel: x\n").items().isEmpty());
-        check("echecs detectes", Repairs.failed("Exception occurred while executing") && Repairs.failed("cmd: Can't find service") == false && !Repairs.failed("Success"));
+        check("echecs detectes", Repairs.failed("Exception occurred while executing") && Repairs.failed("cmd: Can't find service") && Repairs.failed("** No activities found to run, monkey aborted.") && !Repairs.failed("Success"));
         String secret = "secret-de-test";
         String code = LicenseCodec.make(secret, "ABCD2345");
         check("code valide accepte (avec/sans tirets, minuscules)", LicenseCodec.verify(secret, code) && LicenseCodec.verify(secret, code.toLowerCase().replace("-", " ")));

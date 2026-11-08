@@ -3,9 +3,7 @@ package fr.doctablette;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
-import android.text.Editable;
 import android.text.InputType;
-import android.text.TextWatcher;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -34,6 +32,15 @@ final class ExtraScreens {
     Guide.Card card;
     boolean authRefused;
 
+    /** Liste des appareils USB, vide si le téléphone n'a pas de service USB (jamais d'erreur). */
+    java.util.Map<String, android.hardware.usb.UsbDevice> usbDevices() {
+        try {
+            return a.usb == null ? new java.util.HashMap<>() : usbDevices();
+        } catch (Exception e) {
+            return new java.util.HashMap<>();
+        }
+    }
+
     Uri tree;
     final boolean[] kindOn = {true, false, false, false};
     List<Backup.Item> items;
@@ -54,7 +61,7 @@ final class ExtraScreens {
     // ------------------------------------------------------------------
     void refreshSituation() {
         String banner = a.link.cx != null ? a.link.cx.banner() : "";
-        situation = Situation.best(a.usb.getDeviceList(), banner, a.link.isConnected(), authRefused,
+        situation = Situation.best(usbDevices(), banner, a.link.isConnected(), authRefused,
                 a.getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST));
     }
 
@@ -132,6 +139,7 @@ final class ExtraScreens {
         } else {
             c.addView(a.btn("Arrêter la copie", false, v -> {
                 if (backup != null) backup.cancel = true;
+                a.link.abortCurrent();
             }));
         }
         LinearLayout st = a.card(0);
@@ -313,12 +321,20 @@ final class ExtraScreens {
                 photoUri = a.getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
                 Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
                 i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, photoUri);
+                i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 a.startActivityForResult(i, REQ_PHOTO);
             } else {
                 scanMsg = "Sur ce téléphone, prenez la photo avec l'appli Appareil photo, puis touchez « Choisir une photo déjà prise ».";
                 a.render();
             }
         } catch (Exception e) {
+            if (photoUri != null) {
+                try {
+                    a.getContentResolver().delete(photoUri, null, null);
+                } catch (Exception ignored) {
+                }
+                photoUri = null;
+            }
             scanMsg = "Impossible d'ouvrir l'appareil photo. Touchez « Choisir une photo déjà prise » ou écrivez le modèle.";
             a.render();
         }
@@ -350,18 +366,39 @@ final class ExtraScreens {
         scanBrand = "";
         scanText = "";
         a.render();
+        final Uri uu = u;
+        a.net.execute(() -> {
+            final com.google.mlkit.vision.common.InputImage img;
+            try {
+                img = com.google.mlkit.vision.common.InputImage.fromFilePath(a, uu); // décodage de la photo hors du fil d'interface
+            } catch (Exception e) {
+                a.ui.post(() -> {
+                    scanBusy = false;
+                    scanMsg = "Photo illisible. Réessayez avec plus de lumière, ou écrivez le modèle.";
+                    a.render();
+                });
+                return;
+            }
+            a.ui.post(() -> analyzeImage(img));
+        });
+    }
+
+    private com.google.mlkit.vision.text.TextRecognizer textClient;
+    private com.google.mlkit.vision.barcode.BarcodeScanner barcodeClient;
+
+    private void analyzeImage(com.google.mlkit.vision.common.InputImage img) {
         try {
-            final com.google.mlkit.vision.common.InputImage img = com.google.mlkit.vision.common.InputImage.fromFilePath(a, u);
+            if (textClient == null) textClient = com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS);
+            if (barcodeClient == null) barcodeClient = com.google.mlkit.vision.barcode.BarcodeScanning.getClient();
             final int[] pending = {2};
             final StringBuilder all = new StringBuilder();
-            com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
-                    .process(img)
+            textClient.process(img)
                     .addOnSuccessListener(t -> {
                         all.append(t.getText());
                         done(pending, all);
                     })
                     .addOnFailureListener(e -> done(pending, all));
-            com.google.mlkit.vision.barcode.BarcodeScanning.getClient().process(img)
+            barcodeClient.process(img)
                     .addOnSuccessListener(list -> {
                         for (com.google.mlkit.vision.barcode.common.Barcode b : list) {
                             String v = b.getRawValue();
@@ -418,7 +455,7 @@ final class ExtraScreens {
     Uri fbImage;
 
     android.hardware.usb.UsbDevice fastbootDevice() {
-        for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
+        for (android.hardware.usb.UsbDevice d : usbDevices().values())
             if (fr.doctablette.adb.UsbAdbChannel.hasFastbootInterface(d)) return d;
         return null;
     }
@@ -443,7 +480,7 @@ final class ExtraScreens {
         k.addView(fbLine);
         c.addView(k);
         if (fbBusy) return;
-        if (!a.usb.hasPermission(d)) {
+        if (a.usb == null || !a.usb.hasPermission(d)) {
             final android.hardware.usb.UsbDevice dd = d;
             c.addView(a.btn("Autoriser l'accès USB à la tablette", true, v -> {
                 android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(a, 0,
@@ -480,6 +517,7 @@ final class ExtraScreens {
         e.setHintTextColor(MainActivity.MUTED);
         e.setTextColor(MainActivity.TEXT);
         e.setSingleLine(true);
+        a.keepDraft("fbpart", e);
         c.addView(e, new LinearLayout.LayoutParams(MainActivity.MATCH, MainActivity.WRAP));
         c.addView(a.btn(fbImage == null ? "Choisir le fichier image (.img)" : "Fichier choisi : changer", false, v -> {
             fbPartition = e.getText().toString().trim();
@@ -562,8 +600,8 @@ final class ExtraScreens {
     TextView odinLine;
 
     android.hardware.usb.UsbDevice odinDevice() {
-        for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
-            if (d.getVendorId() == 0x04e8 && fr.doctablette.adb.UsbAdbChannel.hasCdcDataInterface(d)) return d;
+        for (android.hardware.usb.UsbDevice d : usbDevices().values())
+            if (d.getVendorId() == 0x04e8 && d.getProductId() == 0x685d && fr.doctablette.adb.UsbAdbChannel.hasCdcDataInterface(d)) return d;
         return null;
     }
 
@@ -586,7 +624,7 @@ final class ExtraScreens {
         k.addView(odinLine);
         c.addView(k);
         if (odinBusy) return;
-        if (!a.usb.hasPermission(d)) {
+        if (a.usb == null || !a.usb.hasPermission(d)) {
             final android.hardware.usb.UsbDevice dd = d;
             c.addView(a.btn("Autoriser l'accès USB à la tablette", true, v -> {
                 android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(a, 0,
@@ -642,6 +680,7 @@ final class ExtraScreens {
     // ------------------------------------------------------------------
     void openGuide(String q) {
         guideQuery = q == null ? "" : q;
+        a.drafts.remove("guide");
         guideCat = "";
         guideUnconv = false;
         if (!a.top().equals("GUIDE")) a.go("GUIDE");
@@ -673,6 +712,7 @@ final class ExtraScreens {
             }
             c.addView(a.btn("Effacer la recherche", false, v -> {
                 guideQuery = "";
+                a.drafts.remove("guide");
                 a.render();
             }));
             return;
@@ -862,7 +902,7 @@ final class ExtraScreens {
     volatile TextView chipLine;
 
     android.hardware.usb.UsbDevice chipDevice() {
-        for (android.hardware.usb.UsbDevice d : a.usb.getDeviceList().values())
+        for (android.hardware.usb.UsbDevice d : usbDevices().values())
             if (ChipDb.of(d.getVendorId(), d.getProductId()) != null && isChipMode(d)) return d;
         return null;
     }
@@ -910,7 +950,7 @@ final class ExtraScreens {
             c.addView(a.tv("Pas de test de lecture pour cette puce dans cette version. Voir le guide pour ce cas.", 14, MainActivity.MUTED, false));
             return;
         }
-        if (!a.usb.hasPermission(d)) {
+        if (a.usb == null || !a.usb.hasPermission(d)) {
             final android.hardware.usb.UsbDevice dd = d;
             c.addView(a.btn("Autoriser l'accès USB à la tablette", true, v -> {
                 android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(a, 0,
@@ -933,7 +973,7 @@ final class ExtraScreens {
         a.io.execute(() -> {
             fr.doctablette.adb.UsbAdbChannel ch = null;
             try {
-                android.hardware.usb.UsbDevice d = a.usb.getDeviceList().get(devName);
+                android.hardware.usb.UsbDevice d = usbDevices().get(devName);
                 if (d == null || !isChipMode(d)) throw new java.io.IOException("Tablette débranchée");
                 ch = fr.doctablette.adb.UsbAdbChannel.openBulk(a.usb, d);
                 fr.doctablette.adb.ChipProbe p = new fr.doctablette.adb.ChipProbe(ch);

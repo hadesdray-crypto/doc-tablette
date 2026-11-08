@@ -85,7 +85,7 @@ public final class AdbConnection {
         while (off < len) {
             long left = deadline - System.currentTimeMillis();
             if (left <= 0) {
-                if (off > 0) throw new IOException("Message ADB tronqué");
+                if (off > 0) { closed = true; throw new IOException("Message ADB tronqué"); };
                 return false;
             }
             int r = ch.read(b, off, len - off, (int) Math.min(left, 1000));
@@ -117,7 +117,7 @@ public final class AdbConnection {
         if (len > 0) {
             byte[] d = new byte[len];
             // l'en-tête est arrivé : le contenu doit suivre rapidement
-            if (!readFully(d, len, System.currentTimeMillis() + 10000)) throw new IOException("Message ADB tronqué");
+            if (!readFully(d, len, System.currentTimeMillis() + 10000)) { closed = true; throw new IOException("Message ADB tronqué"); };
             m.data = d;
         }
         return m;
@@ -165,10 +165,6 @@ public final class AdbConnection {
     /** Résultat d'une commande : texte renvoyé par la tablette. */
     public String shell(String command, long timeoutMs) throws IOException {
         return text(run("shell:" + command, null, 0, timeoutMs));
-    }
-
-    public String exec(String command, long timeoutMs) throws IOException {
-        return text(run("exec:" + command, null, 0, timeoutMs));
     }
 
     /** Envoie un flux (fichier) à une commande « exec: ». */

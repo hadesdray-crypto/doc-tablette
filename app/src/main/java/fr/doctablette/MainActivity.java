@@ -30,7 +30,6 @@ import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.text.InputType;
 import android.util.Base64;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -133,6 +132,7 @@ public class MainActivity extends Activity {
         render();
         handleIntent(getIntent());
         checkAppUpdate(false);
+        io.execute(() -> Guide.all(getApplicationContext())); // le guide se charge en arrière-plan, pas sur le fil d'interface
         final String last = Guard.takeLast(this);
         if (last != null) ui.postDelayed(() -> incidentDialog(last), 600);
     }
@@ -207,6 +207,10 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (stack.size() <= 1) {
             ask("Quitter ?", "Voulez-vous quitter Doc Tablette ?", "Quitter", this::finish);
+            return;
+        }
+        if ((top().equals("FASTBOOT") && extra.fbBusy) || (top().equals("BACKUP") && extra.backupBusy)) {
+            toast("Attendez la fin de l'opération en cours, ou touchez « Arrêter ».");
             return;
         }
         if (top().equals("REPAIR") && busy) {
@@ -565,7 +569,8 @@ public class MainActivity extends Activity {
         UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
         if (d == null) return;
         if (UsbAdbChannel.hasAdbInterface(d)) {
-            if (!top().equals("CONNECT")) stack.add("CONNECT");
+            stack.remove("CONNECT");
+            stack.add("CONNECT");
             scanUsb(true);
             render();
         } else {
@@ -811,9 +816,13 @@ public class MainActivity extends Activity {
     // Réparer
     // =====================================================================
     void logLine(String s) {
-        repairLog.append(s).append('\n');
+        final String copy;
+        synchronized (repairLog) {
+            repairLog.append(s).append('\n');
+            copy = repairLog.toString();
+        }
         ui.post(() -> {
-            if (repairLogView != null) repairLogView.setText(repairLog.toString());
+            if (repairLogView != null) repairLogView.setText(copy);
         });
     }
 
@@ -929,6 +938,7 @@ public class MainActivity extends Activity {
                 }
                 Set<String> dis = new HashSet<>(prefs.getStringSet("disabled_" + link.key, new HashSet<>()));
                 for (String p : dis) {
+                    if (cancel) break;
                     if (!p.matches("[A-Za-z0-9._]+")) continue;
                     logLine("- Réactiver " + p + "…");
                     try {
@@ -945,6 +955,7 @@ public class MainActivity extends Activity {
                 }
                 Set<String> rem = new HashSet<>(prefs.getStringSet("removed_" + link.key, new HashSet<>()));
                 for (String p : rem) {
+                    if (cancel) break;
                     if (!p.matches("[A-Za-z0-9._]+")) continue;
                     logLine("- Remettre " + p + "…");
                     try {
@@ -960,7 +971,7 @@ public class MainActivity extends Activity {
                         logLine("  impossible : " + e.getMessage());
                     }
                 }
-                logLine("Terminé.");
+                logLine(cancel ? "Arrêté." : "Terminé.");
             } finally {
                 busy = false;
                 ui.post(() -> {
@@ -1033,7 +1044,7 @@ public class MainActivity extends Activity {
     void appsScreen(LinearLayout c) {
         if (!needLicense(c)) return;
         if (!needTablet(c)) return;
-        c.addView(tv("Touchez une appli pour l'arrêter, la désactiver ou la désinstaller. Tout est demandé avant d'agir.", 15, MUTED, false));
+        c.addView(tv("Touchez une appli pour l'arrêter, la désactiver ou la désinstaller. Désactiver et désinstaller sont toujours confirmés avant d'agir.", 15, MUTED, false));
         c.addView(btn(apps == null ? "Charger la liste des applis" : "Actualiser la liste", apps == null, v -> loadApps()));
         if (!appsMsg.isEmpty()) c.addView(tv(appsMsg, 15, C_WARN, false));
         if (apps != null) {
@@ -1184,7 +1195,7 @@ public class MainActivity extends Activity {
             extra.onTree(data.getData());
             return;
         }
-        if (req == REQ_APK && res == RESULT_OK && data != null && data.getData() != null) installApk(data.getData());
+        if (req == REQ_APK && res == RESULT_OK && data != null && data.getData() != null) confirmInstallApk(data.getData());
     }
 
     static String installError(String out) {
@@ -1195,6 +1206,22 @@ public class MainActivity extends Activity {
         if (out.contains("NO_MATCHING_ABIS")) return "Cette appli n'est pas compatible avec le processeur de la tablette.";
         if (out.contains("INVALID_APK") || out.contains("PARSE")) return "Le fichier n'est pas une appli valide.";
         return "La tablette a refusé : " + out.trim();
+    }
+
+    /** Rien n'est installé sur la tablette sans que le nom et la taille du fichier aient été montrés et confirmés. */
+    void confirmInstallApk(final Uri uri) {
+        String name = "fichier";
+        long size = -1;
+        try (Cursor cu = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE}, null, null, null)) {
+            if (cu != null && cu.moveToFirst()) {
+                if (!cu.isNull(0)) name = cu.getString(0);
+                if (!cu.isNull(1)) size = cu.getLong(1);
+            }
+        } catch (Exception ignored) {
+        }
+        String taille = size > 0 ? String.format(java.util.Locale.FRANCE, "%.1f Mo", size / 1048576.0) : "taille inconnue";
+        ask("Installer sur la tablette ?", name + " (" + taille + ")\n\nSera installé sur : " + link.label
+                + "\nSi une appli du même nom existe déjà, elle sera remplacée (ses données sont gardées).", "Installer", () -> installApk(uri));
     }
 
     void installApk(Uri uri) {
@@ -1239,7 +1266,14 @@ public class MainActivity extends Activity {
                         cx.execWithInput("head -c " + size + " > /data/local/tmp/dt-install.apk", in, 900000);
                     }
                     setUpd("Installation sur la tablette…", -1);
-                    out = link.sh("pm install -r /data/local/tmp/dt-install.apk; rm -f /data/local/tmp/dt-install.apk", 300000);
+                    try {
+                        out = link.sh("pm install -r /data/local/tmp/dt-install.apk", 300000);
+                    } finally {
+                        try {
+                            link.sh("rm -f /data/local/tmp/dt-install.apk", 15000);
+                        } catch (IOException ignored) {
+                        }
+                    }
                 }
                 cx.setProgress(null);
                 final String res = out;
@@ -1264,7 +1298,7 @@ public class MainActivity extends Activity {
     // =====================================================================
     void testsScreen(LinearLayout c) {
         if (!needTablet(c)) return;
-        c.addView(tv("Ouvre sur la tablette une page avec trois tests : pixels morts de l'écran, tactile, et son.", 15, MUTED, false));
+        c.addView(tv("Ouvre sur la tablette une page avec trois tests : pixels morts de l'écran, tactile, et son. Si le navigateur refuse la page directe, un petit fichier « doc-tablette-test.html » est posé dans Téléchargements de la tablette (vous pouvez le supprimer après).", 15, MUTED, false));
         c.addView(btn("Lancer les tests sur la tablette", true, v -> openTestPage()));
         c.addView(btn("Voir le matériel détecté", false, v -> hardware()));
         if (!hwText.isEmpty()) {
@@ -1434,7 +1468,6 @@ public class MainActivity extends Activity {
 
     void doInstall(File apk) {
         try {
-            Updater.backupCurrent(this);
             setUpd("Installation en cours… Confirmez si Android le demande.", -1);
             Updater.install(this, apk, ACTION_INSTALL);
         } catch (Exception e) {
@@ -1473,9 +1506,12 @@ public class MainActivity extends Activity {
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(a)) {
                 UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if (link.usbDevice != null && d != null && link.usbDevice.getDeviceName().equals(d.getDeviceName())) {
+                    if (busy) {
+                        cancel = true;
+                        link.abortCurrent();
+                    }
                     link.disconnect();
                     connectMsg = "Tablette débranchée.";
-                    busy = false;
                 }
                 scanUsb(false);
                 render();

@@ -230,8 +230,14 @@ final class Backup {
                         final long tot = total;
                         final int num = n;
                         CountingStream out = new CountingStream(cr.openOutputStream(f, "w"));
-                        link.cx.stream("exec:cat " + q(it.path), null, out, 600000);
-                        out.close();
+                        try {
+                            link.cx.stream("exec:cat " + q(it.path), null, out, 600000);
+                        } finally {
+                            try {
+                                out.close();
+                            } catch (IOException ignored) {
+                            }
+                        }
                         if (it.size >= 0 && out.count != it.size) throw new IOException("Taille différente : " + out.count + " au lieu de " + it.size);
                         r.bytes += out.count;
                         done += Math.max(out.count, 0);
@@ -241,6 +247,10 @@ final class Backup {
                     } catch (IOException e) {
                         last = e;
                         String em = e.getMessage() == null ? "" : e.getMessage();
+                        if (em.contains("Arrêté à votre demande")) {
+                            cancel = true;
+                            attempt = 2;
+                        }
                         if (em.contains("Commande refusée")) {
                             last = new IOException("Cette tablette est trop ancienne pour la copie par câble (Android 4). Utilisez le mode « Transfert de fichiers » et l'appli Fichiers du téléphone.");
                             attempt = 2;

@@ -9,7 +9,7 @@ final class Texts {
             "1. Sur la tablette : activez le « débogage USB » (voir « Aide : brancher la tablette »).\n\n"
                     + "2. Branchez la tablette à ce téléphone avec le câble. Sur la tablette, touchez « Autoriser » (cochez « Toujours autoriser »).\n\n"
                     + "3. Touchez « Bilan » pour voir la santé de la tablette, puis « Tout réparer ».\n\n"
-                    + "Le contenu de la tablette ne quitte jamais le téléphone. Internet ne sert qu'à vérifier les mises à jour de Doc Tablette.";
+                    + "Le contenu de la tablette ne quitte jamais le téléphone. Internet ne sert qu'aux mises à jour de Doc Tablette et, pour le mode photo, aux modules de lecture fournis par les services Google.";
 
     static final String HELP =
             "ACTIVER LE DÉBOGAGE USB SUR LA TABLETTE (une seule fois)\n"
@@ -63,7 +63,7 @@ final class Texts {
                     + "Doc Tablette ne collecte aucune donnée personnelle.\n\n"
                     + "- Les informations lues sur la tablette (modèle, stockage, batterie, liste des applis) restent sur votre téléphone et ne sont envoyées nulle part.\n"
                     + "- La clé de sécurité qui permet de se connecter à la tablette est créée et gardée sur votre téléphone.\n"
-                    + "- L'appli contacte Internet uniquement pour chercher une mise à jour sur GitHub. Cette requête ne contient aucune information vous concernant.\n"
+                    + "- L'appli contacte Internet pour chercher et télécharger ses mises à jour sur GitHub, et le mode photo utilise les modules de lecture de texte et de codes-barres fournis par les services Google Play (téléchargés par ces services). Ces requêtes ne contiennent aucune information sur la tablette réparée.\n"
                     + "- Le code d'activation est vérifié sur le téléphone, sans connexion.\n"
                     + "- Le bouton « ? » prépare un message d'erreur que vous copiez ou envoyez vous-même : rien ne part automatiquement.\n\n"
                     + "Responsable : [ À COMPLÉTER : nom de l'entreprise ]\n"

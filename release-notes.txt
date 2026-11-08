@@ -1,1 +1,7 @@
-Corrections : le bouton « Arrêter » d'une réparation arrête vraiment la commande en cours et permet de revenir en arrière ; plus de fausse alerte « la tablette refuse la connexion » après une connexion réussie ; ce que vous tapez (code de licence, recherche, modèle) n'est plus perdu si le câble bouge ; la sauvegarde parcourt aussi la carte microSD et sait lire les très vieilles tablettes ; « Désinstaller » explique le vrai résultat et « Annuler mes réglages » remet les applis livrées avec la tablette ; le numéro de série n'est plus gardé en clair sur le téléphone ; textes plus exacts sur Internet et le rapport client ; l'appli ne s'ouvre plus pour une clé USB ou un appareil photo quelconque. Nouveau : écran « Puces » (MediaTek, Rockchip, Allwinner, Unisoc…) en lecture seule, rapport pour le client.
+- Rien ne s'installe sur la tablette sans avoir montré le nom et la taille du fichier et demandé confirmation.
+- « Arrêter » arrête vraiment : réparations, annulation des réglages et copie des photos s'interrompent sur la commande en cours.
+- Pendant une copie ou une écriture fastboot, la flèche retour prévient au lieu de quitter l'écran.
+- Les tablettes sans Play Store ne sont plus signalées « terminé » à tort pour les mises à jour d'applis.
+- Le guide et la lecture des photos ne figent plus l'écran sur les téléphones lents.
+- Nettoyage : code inutile retiré, fichiers internes allégés (25 Ko de moins), notes de travail retirées de l'appli.
+- Textes plus exacts : ce qui passe par Internet, le fichier de test déposé dans Téléchargements, ce qui est confirmé avant d'agir.

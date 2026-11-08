@@ -16,8 +16,7 @@ def add(f):
         "v": 1 if f.get("confiance") == "confirmee" and len(srcs) >= 2 else 0,
         "k": f.get("risque", "faible"), "p": 1 if f.get("perte_donnees") else 0,
         "m": f.get("marques", ["toutes"]), "a": f.get("android", "tous"),
-        "nec": f.get("necessite", []), "e": f["etapes"], "w": f.get("attention", ""), "s": srcs[:3],
-        "l": f.get("langue_source", "")})
+        "nec": f.get("necessite", []), "e": f["etapes"], "w": f.get("attention", ""), "s": srcs[:3]})
 for p in sorted(glob.glob(os.path.join(src, "*.json"))):
     b = os.path.basename(p)
     if b[:2].isdigit() and "b-" in b[:4] or b.endswith("b.json") or "-paquets" in b or "prefixes" in b or "marques" in b and b.startswith("07b"): continue
