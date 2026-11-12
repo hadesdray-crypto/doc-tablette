@@ -1,3 +1,4 @@
+- Correction : certains écrans (connexion, réparation, copie) ne s'affichaient plus (« Cet écran n'a pas pu s'afficher »).
 - Rien ne s'installe sur la tablette sans avoir montré le nom et la taille du fichier et demandé confirmation.
 - « Arrêter » arrête vraiment : réparations, annulation des réglages et copie des photos s'interrompent sur la commande en cours.
 - Pendant une copie ou une écriture fastboot, la flèche retour prévient au lieu de quitter l'écran.

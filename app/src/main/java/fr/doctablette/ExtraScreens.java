@@ -35,7 +35,7 @@ final class ExtraScreens {
     /** Liste des appareils USB, vide si le téléphone n'a pas de service USB (jamais d'erreur). */
     java.util.Map<String, android.hardware.usb.UsbDevice> usbDevices() {
         try {
-            return a.usb == null ? new java.util.HashMap<>() : usbDevices();
+            return a.usb == null ? new java.util.HashMap<>() : a.usb.getDeviceList();
         } catch (Exception e) {
             return new java.util.HashMap<>();
         }

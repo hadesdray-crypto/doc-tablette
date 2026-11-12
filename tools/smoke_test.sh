@@ -50,6 +50,7 @@ home || fail "retour à l'accueil après « Compris »"
 # Chaque écran s'ouvre, a son texte, et la flèche retour d'Android revient à l'accueil
 for ecran in "Aide : brancher la tablette" "Informations légales" "Licence : activer" "Mettre à jour Doc Tablette" "Tests : écran, tactile, son" "Mises à jour" "Applis de la tablette" "Tout réparer" "Connecter la tablette"; do
   tap_text "$ecran" || fail "bouton « $ecran » introuvable sur l'accueil"
+  texts | grep -q "pas pu s.afficher" && fail "« $ecran » : écran de secours affiché (l'écran a planté)"
   texts | grep -q "Retour" || fail "« $ecran » : pas de bouton Retour visible"
   texts | grep -q "^?$" || fail "« $ecran » : bouton ? absent"
   adb shell input keyevent KEYCODE_BACK; sleep 1
@@ -61,6 +62,9 @@ done
 tap_text "Aide : brancher la tablette" || fail "aide"
 tap_text "Retour" || fail "bouton Retour"
 home || fail "bouton Retour de l'aide"
+
+# Accueil : l'écran de secours ne doit jamais apparaître
+texts | grep -q "pas pu s.afficher" && fail "accueil : écran de secours affiché"
 
 # Rotation en paysage puis retour portrait : l'écran reste utilisable
 adb shell settings put system accelerometer_rotation 0
