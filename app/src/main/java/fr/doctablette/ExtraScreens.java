@@ -510,6 +510,16 @@ final class ExtraScreens {
             fr.doctablette.adb.Fastboot.Reply r = fb.command("erase:cache", 60000);
             fbSay(r.ok ? "Cache vidé." : "Refusé : " + r.text + " (appareil verrouillé ?)");
         }))));
+        c.addView(a.btn("Effacer toutes les données (état d'usine)", false, v -> a.ask("EFFACER TOUT ?", "Toutes les photos, vidéos, applis et réglages de la tablette seront effacés pour toujours. À faire seulement si le propriétaire est d'accord. La tablette peut refuser si son démarrage est verrouillé.", "Tout effacer", () -> fbRun(() -> {
+            fr.doctablette.adb.Fastboot.Reply r = fb.command("erase:userdata", 120000);
+            if (!r.ok) {
+                fbSay("Refusé par la tablette : " + r.text + ". Rien n'a été effacé.");
+                return;
+            }
+            fr.doctablette.adb.Fastboot.Reply c2 = fb.command("erase:cache", 60000);
+            fb.command("reboot", 8000);
+            fbSay("Données effacées" + (c2.ok ? "" : " (cache non vidé : " + c2.text + ")") + ". Redémarrage demandé : le premier démarrage peut durer plusieurs minutes.");
+        }))));
         c.addView(a.tv("Installer une image (avancé)", 17, MainActivity.ACCENT, true));
         final EditText e = new EditText(a);
         e.setText(fbPartition);
